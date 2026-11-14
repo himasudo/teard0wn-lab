@@ -211,7 +211,9 @@ export class Machine {
     let p=Number(this.rip),rex=0,w16=false;
     const take=()=>{this.range(p,1,'execute');return this.memory[p++];};
     const imm=(n,sign=false)=>{let v=0n;for(let i=0;i<n;i++)v|=BigInt(take())<<BigInt(8*i);return sign?signed(v,n*8):v;};
-    let op=take();if(op===0x66){w16=true;op=take();}if(op>=0x40&&op<=0x4f){rex=op;op=take();}
+    let op=take();
+    while(op===0x66||op===0x2e||op===0x3e||op===0x26||op===0x36||op===0x64||op===0x65||op===0xf0||op===0xf2||op===0xf3){if(op===0x66)w16=true;op=take();}
+    if(op>=0x40&&op<=0x4f){rex=op;op=take();}
     const wide=rex&8?64:w16?16:32;
     const reg=(id,width)=>{if(width===8&&!rex&&id>=4&&id<=7)fail('High-byte registers ah/ch/dh/bh are outside this engine subset.');return {kind:'reg',id,width};};
     const rm=(width)=>{
@@ -227,6 +229,14 @@ export class Machine {
     };
     let name,args=[];
     if(op===0x90)name='nop';else if(op===0xc3)name='ret';else if(op===0xcc)name='int3';
+    else if(op===0xc9)name='leave';
+    else if(op===0x98){name='cdqe';args=[{width:wide}];}
+    else if(op===0x99){name='cdq';args=[{width:wide}];}
+    else if(op===0xeb){const d=imm(1,true);name='jmp';args=[{kind:'imm',width:64,value:BigInt(p)+d}];}
+    else if(op>=0x70&&op<=0x7f){name='jcc';const d=imm(1,true);args=[{kind:'imm',width:64,value:BigInt(p)+d},{condition:op&15}];}
+    else if(op===0x63){const x=rm(32);name='movsxd';args=[reg(x.field,64),x.operand];}
+    else if(op===0x87){const x=rm(wide);name='xchg';args=[x.operand,reg(x.field,wide)];}
+    else if(op===0xd0||op===0xd1||op===0xd2||op===0xd3){const w=op&1?wide:8,x=rm(w);name=({4:'shl',5:'shr',7:'sar'})[x.field];if(!name)fail('Unsupported shift group.');args=[x.operand,op<=0xd1?{kind:'imm',width:8,value:1n}:{kind:'reg',id:1,width:8}];}
     else if(op===0xe8||op===0xe9){name=op===0xe8?'call':'jmp';const d=imm(4,true);args=[{kind:'imm',width:64,value:BigInt(p)+d}];}
     else if(op>=0x50&&op<=0x5f){name=op<0x58?'push':'pop';args=[reg((op&7)|((rex&1)?8:0),64)];}
     else if(op===0x68){name='push';args=[{kind:'imm',width:64,value:imm(4,true)}];}
@@ -236,16 +246,26 @@ export class Machine {
       if(op2===0x05)name='syscall';
       else if(op2>=0x80&&op2<=0x8f){name='jcc';const d=imm(4,true);args=[{kind:'imm',width:64,value:BigInt(p)+d},{condition:op2&15}];}
       else if(op2===0xaf){name='imul';const x=rm(wide);args=[reg(x.field,wide),x.operand];}
+      else if(op2===0x1e){take();name='nop';}
+      else if(op2===0x1f){rm(wide);name='nop';}
+      else if(op2===0xb6||op2===0xb7){const x=rm(op2===0xb6?8:16);name='movzx';args=[reg(x.field,wide),x.operand];}
+      else if(op2===0xbe||op2===0xbf){const x=rm(op2===0xbe?8:16);name='movsx';args=[reg(x.field,wide),x.operand];}
+      else if(op2>=0x40&&op2<=0x4f){const x=rm(wide);name='cmov';args=[reg(x.field,wide),x.operand,{condition:op2&15}];}
+      else if(op2>=0x90&&op2<=0x9f){const x=rm(8);name='setcc';args=[x.operand,{condition:op2&15}];}
       else fail(`Unsupported 0F opcode 0x${op2.toString(16)}.`);
     }else if([0x88,0x89,0x8a,0x8b,0x8d].includes(op)){
       const w=[0x88,0x8a].includes(op)?8:wide,x=rm(w);name=op===0x8d?'lea':'mov';
       args=op===0x88||op===0x89?[x.operand,reg(x.field,w)]:[reg(x.field,w),x.operand];
     }else if(op===0xc6||op===0xc7){const w=op===0xc6?8:wide,x=rm(w);if(x.field!==0)fail('Invalid MOV encoding.');name='mov';args=[x.operand,{kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)}];}
-    else if(op===0x80||op===0x81){const w=op===0x80?8:wide,x=rm(w);name=Object.keys(groups).find(k=>groups[k]===x.field);if(!name)fail('Unsupported arithmetic group.');args=[x.operand,{kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)}];}
+    else if(op===0x80||op===0x81||op===0x83){const w=op===0x80?8:wide,x=rm(w);name=Object.keys(groups).find(k=>groups[k]===x.field);if(!name)fail('Unsupported arithmetic group.');const value=op===0x83?imm(1,true):imm(Math.min(w,32)/8,w===64);args=[x.operand,{kind:'imm',width:w,value}];}
     else if(op===0x84||op===0x85){const w=op===0x84?8:wide,x=rm(w);name='test';args=[x.operand,reg(x.field,w)];}
-    else if(op===0xf6||op===0xf7||op===0xfe||op===0xff){
-      const w=op===0xf6||op===0xfe?8:wide,x=rm(w);name=op>=0xfe?({0:'inc',1:'dec'})[x.field]:({0:'test',2:'not',3:'neg'})[x.field];
-      if(!name)fail('Unsupported unary group.');args=[x.operand];if(name==='test')args.push({kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)});
+    else if(op===0xf6||op===0xf7){
+      const w=op===0xf6?8:wide,x=rm(w);name=({0:'test',2:'not',3:'neg',4:'mul',5:'imul1',6:'div',7:'idiv'})[x.field];
+      if(!name)fail('Unsupported F6/F7 group.');args=[x.operand];if(name==='test')args.push({kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)});
+    }else if(op===0xfe||op===0xff){
+      const field3=(this.memory[p]>>3)&7,w=op===0xff&&[2,4,6].includes(field3)?64:(op===0xfe?8:wide),x=rm(w);
+      name=(op===0xfe?{0:'inc',1:'dec'}:{0:'inc',1:'dec',2:'callind',4:'jmpind',6:'pushind'})[x.field];
+      if(!name)fail('Unsupported FE/FF group.');args=[x.operand];
     }else if(op===0xc0||op===0xc1){const w=op===0xc0?8:wide,x=rm(w);name=({4:'shl',5:'shr',7:'sar'})[x.field];if(!name)fail('Unsupported shift.');args=[x.operand,{kind:'imm',width:8,value:imm(1)}];}
     else{
       const group=Object.keys(binBase).find(k=>op>=binBase[k]&&op<=binBase[k]+3);
@@ -284,6 +304,22 @@ export class Machine {
         case 'not':this.write(dst,~read());break;
         case 'neg':this.write(dst,this.arithmetic('sub',0n,read(),w));break;
         case 'imul':{const r=signed(read(),w)*signed(rhs(),w);this.write(dst,r);this.flags.CF=this.flags.OF=signed(r,w)!==r;for(const f of ['SF','ZF','AF','PF'])this.flags[f]=null;break;}
+        case 'movzx':this.write(dst,rhs());break;
+        case 'movsx':this.write(dst,unsigned(signed(rhs(),src.width),w));break;
+        case 'movsxd':this.write(dst,unsigned(signed(rhs(),32),w));break;
+        case 'cmov':if(this.condition(d.args[2].condition))this.write(dst,rhs());break;
+        case 'setcc':this.write(dst,this.condition(src.condition)?1n:0n);break;
+        case 'cdqe':{const half=w/2;this.setReg(0,w,unsigned(signed(this.getReg(0,half),half),w));break;}
+        case 'cdq':{const neg=signed(this.getReg(0,w),w)<0n;this.setReg(2,w,neg?mask(w):0n);break;}
+        case 'leave':{this.regs[4]=this.regs[5];const v=this.readMem(this.regs[4],64);this.regs[4]=unsigned(this.regs[4]+8n);this.regs[5]=v;break;}
+        case 'xchg':{const a=read(),b=rhs();this.write(dst,b);this.write(src,a);break;}
+        case 'mul':{const a=this.getReg(0,w),b=read(),prod=a*b;if(w===8)this.setReg(0,16,prod&0xffffn);else{this.setReg(0,w,prod&mask(w));this.setReg(2,w,(prod>>BigInt(w))&mask(w));}this.flags.CF=this.flags.OF=(prod>>BigInt(w))!==0n;for(const f of['SF','ZF','AF','PF'])this.flags[f]=null;break;}
+        case 'imul1':{const prod=signed(this.getReg(0,w),w)*signed(read(),w),lo=unsigned(prod,w);if(w===8)this.setReg(0,16,unsigned(prod,16));else{this.setReg(0,w,lo);this.setReg(2,w,unsigned(prod>>BigInt(w),w));}this.flags.CF=this.flags.OF=signed(lo,w)!==prod;for(const f of['SF','ZF','AF','PF'])this.flags[f]=null;break;}
+        case 'div':{const b=read();if(b===0n)fail('Integer divide by zero.');const dividend=w===8?this.getReg(0,16):(this.getReg(2,w)<<BigInt(w))|this.getReg(0,w),q=dividend/b,r=dividend%b;if(q>mask(w))fail('Divide overflow (quotient too large).');if(w===8)this.setReg(0,16,(r<<8n)|q);else{this.setReg(0,w,q);this.setReg(2,w,r);}for(const f of['CF','OF','SF','ZF','AF','PF'])this.flags[f]=null;break;}
+        case 'idiv':{const b=signed(read(),w);if(b===0n)fail('Integer divide by zero.');const dividend=w===8?signed(this.getReg(0,16),16):signed((this.getReg(2,w)<<BigInt(w))|this.getReg(0,w),w*2),q=dividend/b,r=dividend%b;if(q<-(1n<<BigInt(w-1))||q>(1n<<BigInt(w-1))-1n)fail('Divide overflow (signed quotient out of range).');if(w===8)this.setReg(0,16,(unsigned(r,8)<<8n)|unsigned(q,8));else{this.setReg(0,w,unsigned(q,w));this.setReg(2,w,unsigned(r,w));}for(const f of['CF','OF','SF','ZF','AF','PF'])this.flags[f]=null;break;}
+        case 'callind':{const target=read();this.regs[4]=unsigned(this.regs[4]-8n);this.writeMem(this.regs[4],64,d.next);this.calls.push({target,returnTo:d.next,sp:this.regs[4]});this.rip=target;break;}
+        case 'jmpind':this.rip=read();break;
+        case 'pushind':{const v=read();this.regs[4]=unsigned(this.regs[4]-8n);this.writeMem(this.regs[4],64,v);break;}
         case 'shl':case 'shr':case 'sar':{
           const n=Number(rhs())&(w===64?63:31);if(!n)break;
           const a=read(),nn=BigInt(n),r=unsigned(d.name==='shl'?a<<nn:d.name==='shr'?a>>nn:signed(a,w)>>nn,w);
@@ -316,16 +352,42 @@ export class Machine {
       this.status='fault';this.reason=e.message;this.history.push({before,writes:[],instruction:'fault'});if(this.history.length>512)this.history.shift();return false;
     }
   }
-  run({limit=10000,breakpoints=new Set(),watchpoints=new Set(),skipCurrent=true}={}){
+  run({limit=10000,breakpoints=new Set(),watchpoints=new Set(),skipCurrent=true,until=null}={}){
     let n=0;
     while(n<limit&&!['halted','fault'].includes(this.status)){
       if(breakpoints.has(Number(this.rip))&&(!skipCurrent||n>0)){this.status='paused';this.reason='Address breakpoint';break;}
       if(!this.step())break;n++;
       if(this.reason==='INT3 breakpoint')break;
       if(this.writes.some(x=>watchpoints.has(x.address))){this.reason='Memory write watchpoint';break;}
+      if(until&&until(this)){this.status='paused';break;}
     }
     if(n===limit&&!['halted','fault'].includes(this.status)){this.status='paused';this.reason=`Instruction budget (${limit}) reached`;}
     return n;
+  }
+  // A caller-set stop (step over / finish) should not clobber a breakpoint,
+  // watchpoint, INT3, or budget pause that interrupted the run first.
+  interrupted(){return ['Address breakpoint','Memory write watchpoint','INT3 breakpoint'].includes(this.reason)||this.reason.startsWith('Instruction budget');}
+  // Step over: execute one instruction; if it entered a call, run until the
+  // matching return brings the call depth back to where it started. A breakpoint
+  // or watchpoint inside the skipped region still stops execution.
+  stepOver({breakpoints=new Set(),watchpoints=new Set()}={}){
+    if(['halted','fault'].includes(this.status))return false;
+    const depth=this.calls.length;
+    if(!this.step())return false;
+    if(this.calls.length>depth&&!['halted','fault'].includes(this.status)){
+      this.run({breakpoints,watchpoints,skipCurrent:false,until:m=>m.calls.length<=depth});
+      if(!this.interrupted()&&!['halted','fault'].includes(this.status))this.reason='Stepped over call';
+    }
+    return true;
+  }
+  // Finish: run until the current function returns to its caller (call depth
+  // drops below the current frame). At the top frame this runs to completion.
+  finish({breakpoints=new Set(),watchpoints=new Set()}={}){
+    if(['halted','fault'].includes(this.status))return false;
+    const depth=this.calls.length;
+    this.run({breakpoints,watchpoints,skipCurrent:false,until:depth===0?null:m=>m.calls.length<depth});
+    if(depth>0&&!this.interrupted()&&!['halted','fault'].includes(this.status))this.reason='Returned to caller';
+    return true;
   }
   rowAt(){return this.program.instructions.find(x=>BigInt(x.address)===this.rip);}
 }

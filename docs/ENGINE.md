@@ -10,6 +10,14 @@ Operand widths: 8, 16, 32, 64 bits. Register views: RAX–R15, their 32/16-bit n
 
 Address form: 64-bit base + index × 1/2/4/8 + signed 32-bit displacement. RSP cannot be an index; R12 can. No RIP-relative/address-size override/segment forms. Unsupported instructions and ambiguous widths produce line-specific build errors.
 
+## Decoding compiled output
+
+The decoder understands a larger set than the hand assembler emits, so it can execute real `gcc` output byte-for-byte. Beyond the families above it decodes: `movzx`/`movsx`/`movsxd`, one-operand `mul`/`imul`/`div`/`idiv` with `cdq`/`cqo`/`cdqe`/`cwde`, `cmov`cc, `setcc`, `leave`, `xchg`, shifts by `CL`, sign-extended `imm8` arithmetic (`0x83`), short `rel8` `jmp`/`jcc`, indirect `call`/`jmp`/`push` (`FF /2,/4,/6`), `endbr64`/`endbr32` and multi-byte `nop` (as no-ops), and the legacy/REX prefixes around them.
+
+A differential test (`tests/compiled_check.mjs`) compiles a set of C functions, runs them natively, then executes the identical bytes in this engine and compares return values across many inputs. At `-O0` — the readable teaching target — real functions covering recursion, division/modulo, `switch`, local arrays, variable shifts, and width conversion all match the native CPU. `-O2` matches except where the compiler vectorizes with SSE.
+
+Current boundaries for running compiled code: no SSE/AVX/x87, and RIP-relative operands are not yet decoded, so functions that reference globals, string literals, or jump tables in `.rodata` do not run yet. These are the next decoder items before arbitrary compiled lessons.
+
 ## Memory
 
 | Region | Range | Permissions |
@@ -31,6 +39,7 @@ INC/DEC preserve CF. MOV/LEA/NOT preserve arithmetic flags. Logical instructions
 
 ## Debugger and limits
 
+- Step executes one instruction. Step-over runs a called function to completion and stops after the call; finish runs to the current function's return. Both honour breakpoints and watchpoints encountered inside the region.
 - Address breakpoints stop before execution. Continuing skips the just-hit breakpoint once.
 - Write watchpoints stop after an instruction touches a selected byte, including a same-value write.
 - Reverse stepping restores register/flag/output/call-event state and memory writes. Only the newest 512 steps are retained.

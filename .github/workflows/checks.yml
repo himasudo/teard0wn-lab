@@ -24,6 +24,8 @@ jobs:
         run: npm test
       - name: Native x86-64 differential comparison
         run: python3 tests/native_check.py
+      - name: Compiled-C differential comparison
+        run: node tests/compiled_check.mjs
       - name: Check portable build is current
         run: |
           python3 build.py
