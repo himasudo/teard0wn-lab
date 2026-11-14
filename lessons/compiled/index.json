@@ -1,0 +1,41 @@
+[
+  {
+    "id": "c-classify",
+    "file": "classify.c",
+    "entry": "classify",
+    "title": "Branches under a compiler",
+    "subtitle": "Watch two if-statements become compares and jumps.",
+    "track": "toolchain",
+    "inputLabel": "x (EDI)",
+    "input": { "rdi": 7 },
+    "expect": "00000001",
+    "retBits": 32,
+    "intro": "Three lines of C, each a branch. Step by source line to watch control flow, then step by instruction to see each CMP set the flags a Jcc reads. The sign of x decides the first branch; the zero test decides the second."
+  },
+  {
+    "id": "c-sum-to",
+    "file": "sum_to.c",
+    "entry": "sum_to",
+    "title": "A loop, instruction by instruction",
+    "subtitle": "One C for-loop; count the back-edges.",
+    "track": "toolchain",
+    "inputLabel": "n (EDI)",
+    "input": { "rdi": 5 },
+    "expect": "0000000f",
+    "retBits": 32,
+    "intro": "The accumulator lives in a register; the loop counter is compared each turn. Step by line to ride the loop, or by instruction to see the increment, the compare, and the conditional back-edge that the C for-header hides."
+  },
+  {
+    "id": "c-fib",
+    "file": "fib.c",
+    "entry": "fib",
+    "title": "Recursion on the real stack",
+    "subtitle": "Step into a call; finish out of it.",
+    "track": "toolchain",
+    "inputLabel": "n (EDI)",
+    "input": { "rdi": 10 },
+    "expect": "00000037",
+    "retBits": 32,
+    "intro": "Each call pushes a return address and a frame. Use Step line to descend into fib(n-1), Finish to run a call to its return, and the stack view to watch the frames pile up and unwind."
+  }
+]
