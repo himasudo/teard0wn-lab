@@ -69,3 +69,12 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .elf-table td.mono,.elf-table .mono{font-family:var(--mono)}
 .elf-note{color:var(--muted);font-size:13px;line-height:1.55;margin:8px 0 0}
 .elf-bytes{font-family:var(--mono);font-size:12px;background:var(--surface2);padding:1px 6px;border-radius:5px;color:var(--accent)}
+
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:4px 0 8px}
+.feature-card{display:flex;flex-direction:column;gap:6px;padding:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);text-decoration:none;transition:border-color .15s,transform .15s}
+.feature-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.feature-ic{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:var(--surface3);color:var(--accent)}
+.feature-ic svg{width:18px;height:18px}
+.feature-card h3{margin:2px 0 0;font-size:15px;color:var(--text)}
+.feature-card p{margin:0;font-size:13px;color:var(--muted);line-height:1.5}
+.pill.live{background:var(--accent);color:var(--accentink)}
