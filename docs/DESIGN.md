@@ -104,6 +104,7 @@ real CPU at three layers:
 
 ## Roadmap
 
-1. **Writable data / broader compiled support.** Load `.data`/`.bss` so mutable
-   globals run; decode SSE for vectorized `-O2` output. Both widen what the
-   compiled walkthroughs can show.
+1. **SSE decoding.** Decode the SSE instructions gcc emits when it vectorizes
+   `-O2` output, so those builds run instead of being skipped. (Writable
+   `.data`/`.bss` now loads — a lesson is linked with its data segment at the
+   0x2000 window — so mutable-global programs already run.)

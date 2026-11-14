@@ -37,5 +37,18 @@
     "expect": "00000037",
     "retBits": 32,
     "intro": "Each call pushes a return address and a frame. Use Step line to descend into fib(n-1), Finish to run a call to its return, and the stack view to watch the frames pile up and unwind."
+  },
+  {
+    "id": "c-globals",
+    "file": "histo.c",
+    "entry": "histo",
+    "title": "A global the function writes",
+    "subtitle": "Watch a static array change in memory.",
+    "track": "toolchain",
+    "inputLabel": "x (EDI)",
+    "input": { "rdi": 511 },
+    "expect": "00000003",
+    "retBits": 32,
+    "intro": "The table is a static array in .bss, loaded writable at 0x2000. Open the Memory tab and step: the first loop zeroes the table, then each octal digit of x bumps a counter, so you see the array fill byte by byte. The return value is the largest count. For 511 (0o777) that is three."
   }
 ]

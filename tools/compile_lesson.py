@@ -21,6 +21,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGETS = [('compiled', 'compiledLessons', 'compiled.js'),
            ('fuzz', 'fuzzTargets', 'fuzz.js')]
 BASE = 0x1000
+DATA = 0x2000   # the engine's writable region base; link .data/.bss here
 FLAGS = ['-O0', '-g3', '-gdwarf-4', '-fno-asynchronous-unwind-tables',
          '-fcf-protection=none', '-fno-stack-protector']
 INSN = re.compile(r'^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2} )+)\s+(.*\S)\s*$')
@@ -32,9 +33,24 @@ def build(lesson, d, srcdir):
     c = srcdir / lesson['file']
     obj, elf, binf = d/'l.o', d/'l.elf', d/'l.bin'
     run(['gcc', *FLAGS, '-c', str(c), '-o', str(obj)])
-    run(['ld', str(obj), f'-Ttext={BASE:#x}', '-e', lesson['entry'], '-o', str(elf)])
+    run(['ld', str(obj), f'-Ttext={BASE:#x}', f'-Tdata={DATA:#x}', '-e', lesson['entry'], '-o', str(elf)])
     run(['objcopy', '-O', 'binary', '-j', '.text', '-j', '.rodata', str(elf), str(binf)])
     code = binf.read_bytes()
+    # writable globals (.data initialized + .bss zeroed) placed at DATA
+    secs = {}
+    for m in re.finditer(r'\[\s*\d+\]\s+(\.data|\.bss)\s+\w+\s+([0-9a-f]+)\s+[0-9a-f]+\s+([0-9a-f]+)',
+                         run(['readelf', '-SW', str(elf)])):
+        addr, size = int(m.group(2), 16), int(m.group(3), 16)
+        if size: secs[m.group(1)] = (addr, size)
+    dataHex = ''
+    if secs:
+        end = max(a + s for a, s in secs.values())
+        buf = bytearray(end - DATA)
+        if '.data' in secs:
+            run(['objcopy', '-O', 'binary', '-j', '.data', str(elf), str(d/'data.bin')])
+            db, (a, _) = (d/'data.bin').read_bytes(), secs['.data']
+            buf[a-DATA:a-DATA+len(db)] = db
+        dataHex = buf.hex()
     entry = None
     for line in run(['nm', str(elf)]).splitlines():
         parts = line.split()
@@ -65,7 +81,7 @@ def build(lesson, d, srcdir):
         'intro': lesson['intro'],
         'source': c.read_text().rstrip('\n').split('\n'),
         'base': BASE, 'entry': entry,
-        'codeHex': code.hex(), 'insns': insns,
+        'codeHex': code.hex(), 'dataHex': dataHex, 'insns': insns,
     }
 
 def main():

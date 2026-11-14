@@ -403,10 +403,10 @@ export class Machine {
 // Build a runnable program from a precompiled image (see tools/compile_lesson.py):
 // the .text+.rodata bytes load at the engine's CODE base, and the instruction
 // list (with its C source line) drives the disassembly view.
-export function programFromImage({codeHex,entry,insns=[]}){
-  const code=Uint8Array.from(codeHex.match(/../g).map(b=>parseInt(b,16)));
+export function programFromImage({codeHex,dataHex='',entry,insns=[]}){
+  const hexToBytes=h=>h?Uint8Array.from(h.match(/../g).map(b=>parseInt(b,16))):new Uint8Array(0);
   const instructions=insns.map(i=>({address:i.addr,line:i.line,text:i.text,bytes:i.bytes.split(' ').map(b=>parseInt(b,16))}));
-  return {source:'',labels:{},instructions,code,data:new Uint8Array(0),entry};
+  return {source:'',labels:{},instructions,code:hexToBytes(codeHex),data:hexToBytes(dataHex),entry};
 }
 
 export function exportGNU(source){
