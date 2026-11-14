@@ -18,9 +18,11 @@ RIP-relative operands are decoded (resolved against the next instruction's
 address, after any trailing immediate), so a read-only `.text`+`.rodata` image
 runs: `const` globals, string literals, and `-O2` jump tables all work.
 
-A differential test (`tests/compiled_check.mjs`) compiles a set of C functions, runs them natively, then executes the identical bytes in this engine and compares return values across many inputs. At `-O0` — the readable teaching target — real functions covering recursion, division/modulo, `switch`, local arrays, variable shifts, width conversion, static tables, and string indexing all match the native CPU. `-O2` matches except where the compiler vectorizes with SSE.
+128-bit SSE data moves (`movaps`/`movapd`/`movups`/`movupd`/`movdqa`/`movdqu`) run as well, over a 16-register XMM file, so integer-vectorized init and copy work (for example gcc's `-O2` array initialisation via a 128-bit load and store).
 
-Writable `.data`/`.bss` loads too: a compiled lesson is linked with its data segment at the engine's 0x2000 window and that image is loaded writable, so functions with mutable globals run and the Memory view shows the global change as it happens. The remaining boundary is SSE/AVX/x87: `-O2` code that vectorizes does not run.
+A differential test (`tests/compiled_check.mjs`) compiles a set of C functions, runs them natively, then executes the identical bytes in this engine and compares return values across many inputs. At `-O0` — the readable teaching target — real functions covering recursion, division/modulo, `switch`, local arrays, variable shifts, width conversion, static tables, and string indexing all match the native CPU, and `-O2` builds match too, including a vectorized case.
+
+Writable `.data`/`.bss` loads too: a compiled lesson is linked with its data segment at the engine's 0x2000 window and that image is loaded writable, so functions with mutable globals run and the Memory view shows the global change as it happens. The remaining boundary is SSE/AVX/x87 *arithmetic* and scalar floating-point: 128-bit moves run, but vector or floating-point computation does not yet.
 
 ## Memory
 

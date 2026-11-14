@@ -104,7 +104,7 @@ real CPU at three layers:
 
 ## Roadmap
 
-1. **SSE decoding.** Decode the SSE instructions gcc emits when it vectorizes
-   `-O2` output, so those builds run instead of being skipped. (Writable
-   `.data`/`.bss` now loads — a lesson is linked with its data segment at the
-   0x2000 window — so mutable-global programs already run.)
+1. **SSE/FP arithmetic.** 128-bit SSE moves now run (so integer-vectorized init
+   and copy work); the remaining gap is SSE/x87 arithmetic and scalar
+   floating-point (`addsd`, `mulsd`, `cvtsi2sd`, …), which would let float
+   functions and vectorized loops execute.

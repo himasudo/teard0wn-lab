@@ -188,7 +188,7 @@ export class Machine {
     this.program=program;this.regs=Array(16).fill(0n);this.regs[4]=BigInt(STACK);
     this.flags={CF:false,PF:false,AF:false,ZF:false,SF:false,OF:false};
     this.memory=new Uint8Array(0x10000);this.memory.set(program.code,CODE);this.memory.set(program.data,DATA);
-    this.rip=BigInt(program.entry);this.status='ready';this.reason='Ready at entry';this.steps=0;this.history=[];this.calls=[];this.output='';this.writes=[];this.lastAccesses=[];this.lastBranch=null;
+    this.rip=BigInt(program.entry);this.status='ready';this.reason='Ready at entry';this.steps=0;this.history=[];this.calls=[];this.output='';this.writes=[];this.lastAccesses=[];this.lastBranch=null;this.xmm=new Array(16).fill(0n);
     for(const [name,value] of Object.entries(initial)){
       const r=REGS[name];if(!r)fail(`Unknown initial register ${name}.`);this.setReg(r.id,r.width,BigInt(value));
     }
@@ -205,20 +205,20 @@ export class Machine {
   }
   readMem(address,width){const a=this.range(address,width/8);if(this.lastAccesses)this.lastAccesses.push({address:a,width,write:false});let v=0n;for(let i=0;i<width/8;i++)v|=BigInt(this.memory[a+i])<<BigInt(i*8);return v;}
   writeMem(address,width,value){const a=this.range(address,width/8,'write');if(this.lastAccesses)this.lastAccesses.push({address:a,width,write:true});for(let i=0;i<width/8;i++){const old=this.memory[a+i],next=Number((BigInt(value)>>BigInt(i*8))&255n);this.memory[a+i]=next;this.writes.push({address:a+i,old,value:next});}}
-  read(o){return o.kind==='reg'?this.getReg(o.id,o.width):o.kind==='mem'?this.readMem(o.address,o.width):unsigned(o.value,o.width);}
-  write(o,v){if(o.kind==='reg')this.setReg(o.id,o.width,v);else if(o.kind==='mem')this.writeMem(o.address,o.width,v);else fail('Invalid write destination.');}
+  read(o){return o.kind==='reg'?this.getReg(o.id,o.width):o.kind==='mem'?this.readMem(o.address,o.width):o.kind==='xmm'?this.xmm[o.id]:unsigned(o.value,o.width);}
+  write(o,v){if(o.kind==='reg')this.setReg(o.id,o.width,v);else if(o.kind==='mem')this.writeMem(o.address,o.width,v);else if(o.kind==='xmm')this.xmm[o.id]=unsigned(v,128);else fail('Invalid write destination.');}
   decode(){
     let p=Number(this.rip),rex=0,w16=false;
     const take=()=>{this.range(p,1,'execute');return this.memory[p++];};
     const imm=(n,sign=false)=>{let v=0n;for(let i=0;i<n;i++)v|=BigInt(take())<<BigInt(8*i);return sign?signed(v,n*8):v;};
-    let op=take();
-    while(op===0x66||op===0x2e||op===0x3e||op===0x26||op===0x36||op===0x64||op===0x65||op===0xf0||op===0xf2||op===0xf3){if(op===0x66)w16=true;op=take();}
+    let op=take(),mpfx=null;
+    while(op===0x66||op===0x2e||op===0x3e||op===0x26||op===0x36||op===0x64||op===0x65||op===0xf0||op===0xf2||op===0xf3){if(op===0x66){w16=true;mpfx='66';}else if(op===0xf2)mpfx='f2';else if(op===0xf3)mpfx='f3';op=take();}
     if(op>=0x40&&op<=0x4f){rex=op;op=take();}
     const wide=rex&8?64:w16?16:32;
     const reg=(id,width)=>{if(width===8&&!rex&&id>=4&&id<=7)fail('High-byte registers ah/ch/dh/bh are outside this engine subset.');return {kind:'reg',id,width};};
-    const rm=(width)=>{
+    const rm=(width,xmm=false)=>{
       const b=take(),mode=b>>6,field=((b>>3)&7)|((rex&4)?8:0),low=b&7;
-      if(mode===3)return {field,operand:reg(low|((rex&1)?8:0),width)};
+      if(mode===3)return {field,operand:xmm?{kind:'xmm',id:low|((rex&1)?8:0)}:reg(low|((rex&1)?8:0),width)};
       let base=low|((rex&1)?8:0),index=null,scale=1,disp=0n,ripRelative=false;
       if(low===4){const sib=take();scale=1<<(sib>>6);const ix=(sib>>3)&7;if(ix!==4||(rex&2))index=ix|((rex&2)?8:0);base=(sib&7)|((rex&1)?8:0);if(mode===0&&(sib&7)===5){base=null;disp=imm(4,true);}}
       else if(mode===0&&low===5){base=null;disp=imm(4,true);ripRelative=true;}
@@ -254,6 +254,11 @@ export class Machine {
       else if(op2===0xbe||op2===0xbf){const x=rm(op2===0xbe?8:16);name='movsx';args=[reg(x.field,wide),x.operand];}
       else if(op2>=0x40&&op2<=0x4f){const x=rm(wide);name='cmov';args=[reg(x.field,wide),x.operand,{condition:op2&15}];}
       else if(op2>=0x90&&op2<=0x9f){const x=rm(8);name='setcc';args=[x.operand,{condition:op2&15}];}
+      else if(op2===0x28||op2===0x29||((op2===0x10||op2===0x11)&&(mpfx===null||mpfx==='66'))||((op2===0x6f||op2===0x7f)&&(mpfx==='66'||mpfx==='f3'))){
+        // 128-bit XMM move: movaps/movapd/movups/movupd/movdqa/movdqu
+        const x=rm(128,true),r={kind:'xmm',id:x.field},store=(op2===0x29||op2===0x11||op2===0x7f);
+        name='xmmmov';args=store?[x.operand,r]:[r,x.operand];
+      }
       else fail(`Unsupported 0F opcode 0x${op2.toString(16)}.`);
     }else if([0x88,0x89,0x8a,0x8b,0x8d].includes(op)){
       const w=[0x88,0x8a].includes(op)?8:wide,x=rm(w);name=op===0x8d?'lea':'mov';
@@ -293,8 +298,8 @@ export class Machine {
     switch(c>>1){case 0:need('OF');break;case 1:need('CF');break;case 2:need('ZF');break;case 3:need('CF','ZF');break;case 4:need('SF');break;case 5:need('PF');break;case 6:need('SF','OF');break;case 7:need('ZF','SF','OF');}
     const v=[f.OF,f.CF,f.ZF,f.CF||f.ZF,f.SF,f.PF,f.SF!==f.OF,f.ZF||(f.SF!==f.OF)][c>>1];return c&1?!v:v;
   }
-  snapshot(){return {regs:[...this.regs],flags:{...this.flags},rip:this.rip,status:this.status,reason:this.reason,steps:this.steps,calls:this.calls.map(x=>({...x})),output:this.output};}
-  restore(s){Object.assign(this,{...s,regs:[...s.regs],flags:{...s.flags},calls:s.calls.map(x=>({...x}))});}
+  snapshot(){return {regs:[...this.regs],flags:{...this.flags},rip:this.rip,status:this.status,reason:this.reason,steps:this.steps,calls:this.calls.map(x=>({...x})),output:this.output,xmm:[...this.xmm]};}
+  restore(s){Object.assign(this,{...s,regs:[...s.regs],flags:{...s.flags},calls:s.calls.map(x=>({...x})),xmm:[...(s.xmm||this.xmm)]});}
   rewind(){const h=this.history.pop();if(!h)return false;for(const w of [...h.writes].reverse())this.memory[w.address]=w.old;this.restore(h.before);this.writes=[];return true;}
   step(){
     if(['halted','fault'].includes(this.status))return false;
@@ -314,6 +319,7 @@ export class Machine {
         case 'movzx':this.write(dst,rhs());break;
         case 'movsx':this.write(dst,unsigned(signed(rhs(),src.width),w));break;
         case 'movsxd':this.write(dst,unsigned(signed(rhs(),32),w));break;
+        case 'xmmmov':this.write(dst,rhs());break;
         case 'cmov':if(this.condition(d.args[2].condition))this.write(dst,rhs());break;
         case 'setcc':this.write(dst,this.condition(src.condition)?1n:0n);break;
         case 'cdqe':{const half=w/2;this.setReg(0,w,unsigned(signed(this.getReg(0,half),half),w));break;}
