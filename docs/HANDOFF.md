@@ -28,31 +28,42 @@ and implementation here are independently authored.
 - Native instruction comparison: 421 fixtures passed, zero mismatches.
 - Three native C programs compiled and ran successfully.
 
-## Verification and publishing blockers
+## Verified release and remaining publishing step
 
-Rendered browser verification is **not complete**. The local Chromium runner
-could not start because this execution environment disallows a required local
-socket. A separate cloud browser rejected local-file navigation under its URL
-policy. Do not evade those restrictions. The browser suite is prepared for a
-normal local development environment or GitHub Actions and must pass before
-the publisher enables Pages.
-
-The owner created the public repository on 14 November 2026:
+Source is uploaded to the public repository:
 https://github.com/himasudo/teard0wn-lab
-Repository ID: 1457600714. Its initial main commit is
-c7b59bd938d498a15bd4d2a4a38922c4f3878ad7. Source is being uploaded through the
-connected GitHub integration. Check the repository Actions page for current
-validation status. Pages was not enabled when this upload was prepared.
-The cloud-browser sign-in handoff did not connect on the owner’s device; use
-the GitHub integration for supported operations.
+Repository ID: 1457600714. The owner's initial commit was preserved.
+
+Implementation commit `e3f39bf65acd44f5bc07a39a60593623e06f4f8e` passed the
+complete GitHub Actions workflow on 14 November 2026:
+https://github.com/himasudo/teard0wn-lab/actions/runs/43582204364
+
+- 57 engine and lesson tests passed.
+- 421 native x86-64 comparisons passed, zero mismatches.
+- The portable build matched the checked-in artifact.
+- All 19 browser checks passed, including every runnable lab at 1440, 820,
+  and 390 pixels wide, debugger controls, grading, persistence, progress
+  export/import, theme switching, and navigation.
+- Desktop and phone workbench screenshots were visually reviewed.
+
+The first CI attempt exposed a test timing issue: importing progress reads a
+file asynchronously, but the test asserted before the error toast appeared.
+The test now waits for that feedback. Primary-button hover contrast was also
+corrected before the passing run.
+
+GitHub Pages was still disabled at the last repository check. The connected
+GitHub tools support source updates but do not expose Pages administration.
+The earlier cloud-browser sign-in handoff did not connect on the owner's
+device. Do not repeat that failed handoff or request credentials in chat.
+The owner can enable Pages in Settings > Pages: select "Deploy from a branch",
+then `main`, `/(root)`, and Save. No build server or runtime service is needed.
+The intended URL is https://himasudo.github.io/teard0wn-lab/; verify a successful
+deployment and the actual page before describing it as live.
 
 ## Concrete next work
 
-1. Verify the source upload and its current main commit.
-2. Run the prepared browser suite, fix any UI findings,
-   and inspect screenshots at desktop/tablet/phone widths.
-3. Enable Pages after checks pass and verify the actual public URL.
-4. Continue curriculum development from docs/CURRICULUM.md. Current runnable
+1. Complete the Pages settings step, then verify the deployment and public URL.
+2. Continue curriculum development from docs/CURRICULUM.md. Current runnable
    lessons are a foundation release, not fulfillment of the entire advanced
    curriculum.
 
