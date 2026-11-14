@@ -71,20 +71,27 @@ real CPU at three layers:
 - RIP-relative operands are not decoded yet, so compiled code that touches
   globals, string literals, or `.rodata` jump tables does not run. This is the
   first decoder item before arbitrary compiled lessons.
-- Flat memory map: no caches, TLB, page tables, timing, or branch predictor. The
-  engine models the ISA, not the microarchitecture. The microarchitecture overlay
-  is a separate planned layer.
+- Flat memory map for execution: results never depend on timing. Cache/TLB/branch
+  behaviour is modelled separately as the Micro overlay (see below), not fed back
+  into execution.
 - Modeled syscalls only (`write` to stdout/stderr, `exit`).
+
+## Shipped
+
+- **Debugger.** Step (instruction), Over, Finish, Back, breakpoints, write
+  watchpoints.
+- **Compiled C.** The decoder runs real `gcc -O0`/`-O2` output (RIP-relative,
+  `const` globals, strings, jump tables; SSE excepted). `tools/compile_lesson.py`
+  generates `src/compiled.js`; the Compiled C section shows C and asm side by
+  side with source-line `step`/`next` and instruction `stepi`.
+- **Microarchitecture overlay.** `src/micro.js` models the Memory Systems Lab
+  machine's data caches, TLBs, and a bimodal predictor; the Micro tab shows
+  per-instruction hit level, TLB outcome, prediction, and modeled cycles.
 
 ## Roadmap
 
-1. **C-source pane.** Decode RIP-relative; compile lessons from C with
-   `gcc -O0 -g` in CI; ship bytes + DWARF line map + disassembly as JSON; show C
-   and asm side by side with source-line `step`/`next` alongside instruction
-   `stepi`/`nexti`.
-2. **Microarchitecture overlay.** Per-load L1/L2/L3/DRAM outcome and TLB hit/walk,
-   a labeled cycle estimate, and branch-predictor guess vs outcome, reusing the
-   Memory Systems Lab machine model.
-3. **More tracks.** Two-core + store-buffer mode for TSO/coherence litmus tests;
+1. **More tracks.** Two-core + store-buffer mode for TSO/coherence litmus tests;
    a coverage-guided fuzzing harness over the engine; an ELF/linking/PLT-GOT
    walkthrough.
+2. **Writable data / broader compiled support.** Load `.data`/`.bss` so mutable
+   globals run; decode SSE for vectorized `-O2` output.

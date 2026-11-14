@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101414">
   <meta name="description" content="Take systems apart. An original systems and security laboratory with lessons, editable assembly, and an inspectable x86-64 teaching engine.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-Q+rUXOSnxdf+FJIwEdA4RntTH6UNPAZg7l+Ov6pgbfY='; style-src 'sha256-MUAvkxhZubKzcn/sIOIY0LhHKv67CvG0ujqTAETfsEg='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-ii3J5ZSCHd41pLLmq1xhquYT8ou4u0FcAKlLKn13Br8='; style-src 'sha256-j9ex12+5MzBOaXN7QudZLBhW5usQu4IyAiQKU2Sm0oU='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>teard0wn lab — Understand every layer</title>
   <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTIiIGZpbGw9IiNkNGY3NmIiLz48cGF0aCBkPSJNMTYgMTMgNyAyNGw5IDExTTMyIDEzbDkgMTEtOSAxMU0yNyAxMWwtNiAyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTUxYjEzIiBzdHJva2Utd2lkdGg9IjMuMyIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPgo=" type="image/svg+xml">
   <style>@font-face{font-family:LabSans;src:local('Inter'),local('Arial');font-display:swap}
@@ -27,6 +27,19 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .cline code{color:var(--text);background:none;padding:0;font-family:var(--mono)}
 .cline.active{background:var(--surface3);border-left-color:var(--accent)}
 .cline.active .cn{color:var(--accent)}
+
+.micro-head{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:2px 0 6px}
+.micro-now{display:flex;gap:8px;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px}
+.micro-now .lvl{padding:1px 7px;border-radius:999px;font-size:11px}
+.micro-now .lvl.ok{background:var(--accent);color:var(--accentink)}
+.micro-now .lvl.mid{background:var(--surface3);color:var(--text)}
+.micro-now .lvl.bad{background:var(--red);color:#fff}
+.micro-now .tlbm{color:var(--muted)}
+.micro-now.muted{color:var(--muted)}
+.micro-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.micro-grid>div{display:flex;flex-direction:column;gap:2px;padding:7px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+.micro-grid span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.micro-grid b{font-family:var(--mono);font-size:15px;color:var(--text)}
 </style>
   <script type="module">// machine.js
 // teard0wn x86-64 teaching engine. Encodes and decodes real instruction bytes.
@@ -219,7 +232,7 @@ class Machine {
     this.program=program;this.regs=Array(16).fill(0n);this.regs[4]=BigInt(STACK);
     this.flags={CF:false,PF:false,AF:false,ZF:false,SF:false,OF:false};
     this.memory=new Uint8Array(0x10000);this.memory.set(program.code,CODE);this.memory.set(program.data,DATA);
-    this.rip=BigInt(program.entry);this.status='ready';this.reason='Ready at entry';this.steps=0;this.history=[];this.calls=[];this.output='';this.writes=[];
+    this.rip=BigInt(program.entry);this.status='ready';this.reason='Ready at entry';this.steps=0;this.history=[];this.calls=[];this.output='';this.writes=[];this.lastAccesses=[];this.lastBranch=null;
     for(const [name,value] of Object.entries(initial)){
       const r=REGS[name];if(!r)fail(`Unknown initial register ${name}.`);this.setReg(r.id,r.width,BigInt(value));
     }
@@ -234,8 +247,8 @@ class Machine {
     if(mode==='execute'?!code:mode==='write'?!(data||stack):!(code||data||stack))fail(`${mode==='write'&&code?'Read-only code':mode==='execute'?'Non-executable or unmapped memory':'Unmapped memory'}: ${mode} at 0x${a.toString(16)}.`);
     return a;
   }
-  readMem(address,width){const a=this.range(address,width/8);let v=0n;for(let i=0;i<width/8;i++)v|=BigInt(this.memory[a+i])<<BigInt(i*8);return v;}
-  writeMem(address,width,value){const a=this.range(address,width/8,'write');for(let i=0;i<width/8;i++){const old=this.memory[a+i],next=Number((BigInt(value)>>BigInt(i*8))&255n);this.memory[a+i]=next;this.writes.push({address:a+i,old,value:next});}}
+  readMem(address,width){const a=this.range(address,width/8);if(this.lastAccesses)this.lastAccesses.push({address:a,width,write:false});let v=0n;for(let i=0;i<width/8;i++)v|=BigInt(this.memory[a+i])<<BigInt(i*8);return v;}
+  writeMem(address,width,value){const a=this.range(address,width/8,'write');if(this.lastAccesses)this.lastAccesses.push({address:a,width,write:true});for(let i=0;i<width/8;i++){const old=this.memory[a+i],next=Number((BigInt(value)>>BigInt(i*8))&255n);this.memory[a+i]=next;this.writes.push({address:a+i,old,value:next});}}
   read(o){return o.kind==='reg'?this.getReg(o.id,o.width):o.kind==='mem'?this.readMem(o.address,o.width):unsigned(o.value,o.width);}
   write(o,v){if(o.kind==='reg')this.setReg(o.id,o.width,v);else if(o.kind==='mem')this.writeMem(o.address,o.width,v);else fail('Invalid write destination.');}
   decode(){
@@ -326,7 +339,7 @@ class Machine {
   rewind(){const h=this.history.pop();if(!h)return false;for(const w of [...h.writes].reverse())this.memory[w.address]=w.old;this.restore(h.before);this.writes=[];return true;}
   step(){
     if(['halted','fault'].includes(this.status))return false;
-    const before=this.snapshot();this.writes=[];
+    const before=this.snapshot();this.writes=[];this.lastAccesses=[];this.lastBranch=null;
     try{
       const d=this.decode(),[dst,src]=d.args,w=dst?.width;this.rip=d.next;this.status='paused';this.reason='Single instruction';
       const read=()=>this.read(dst),rhs=()=>this.read(src);
@@ -367,7 +380,7 @@ class Machine {
         case 'call':this.regs[4]=unsigned(this.regs[4]-8n);this.writeMem(this.regs[4],64,d.next);this.calls.push({target:dst.value,returnTo:d.next,sp:this.regs[4]});this.rip=dst.value;break;
         case 'ret':{const target=this.readMem(this.regs[4],64);this.regs[4]=unsigned(this.regs[4]+8n);this.rip=target;this.calls.pop();if(target===BigInt(RETURN)){this.status='halted';this.reason='Returned to the lab harness';}break;}
         case 'jmp':this.rip=dst.value;break;
-        case 'jcc':if(this.condition(src.condition))this.rip=dst.value;break;
+        case 'jcc':{const taken=this.condition(src.condition);this.lastBranch={pc:Number(d.address),taken};if(taken)this.rip=dst.value;break;}
         case 'int3':this.reason='INT3 breakpoint';break;
         case 'nop':break;
         case 'syscall':{
@@ -387,11 +400,11 @@ class Machine {
       this.status='fault';this.reason=e.message;this.history.push({before,writes:[],instruction:'fault'});if(this.history.length>512)this.history.shift();return false;
     }
   }
-  run({limit=10000,breakpoints=new Set(),watchpoints=new Set(),skipCurrent=true,until=null}={}){
+  run({limit=10000,breakpoints=new Set(),watchpoints=new Set(),skipCurrent=true,until=null,onStep=null}={}){
     let n=0;
     while(n<limit&&!['halted','fault'].includes(this.status)){
       if(breakpoints.has(Number(this.rip))&&(!skipCurrent||n>0)){this.status='paused';this.reason='Address breakpoint';break;}
-      if(!this.step())break;n++;
+      if(!this.step())break;n++;if(onStep)onStep(this);
       if(this.reason==='INT3 breakpoint')break;
       if(this.writes.some(x=>watchpoints.has(x.address))){this.reason='Memory write watchpoint';break;}
       if(until&&until(this)){this.status='paused';break;}
@@ -950,11 +963,22 @@ function clab(id){
  <div class="toolbar"><button class="btn" id="c-restart">${icon('reset')}Restart</button><button class="btn" id="c-run">${icon('play')}Run</button><button class="btn primary" id="c-stepline" title="Advance to the next C source line, descending into calls">${icon('step')}Step line</button><button class="btn" id="c-nextline" title="Next C source line, stepping over calls">${icon('over')}Next line</button><button class="btn" id="c-step" title="One machine instruction (stepi)">${icon('step')}Instr</button><button class="btn" id="c-finish" title="Run to the current function's return">${icon('finish')}Finish</button><button class="btn" id="c-back" title="Reverse one instruction">${icon('back')}Back</button></div>
  <div class="status-line" id="machine-status" role="status" aria-live="polite"></div>
  <div class="disassembly"><div class="box-head"><span>DISASSEMBLY</span><span>current instruction highlighted</span></div><div class="dis-scroll"><table class="dis-table"><tbody id="disassembly-rows"></tbody></table></div></div>
- <div class="inspector"><div class="inspect-tabs" role="tablist" aria-label="Machine state">${['registers','memory','stack','history','output'].map(x=>`<button role="tab" aria-selected="${x==='registers'}" class="inspect-tab ${x==='registers'?'active':''}" data-inspect="${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div><div class="inspector-body" id="inspector-body" role="tabpanel"></div></div>
+ <div class="inspector"><div class="inspect-tabs" role="tablist" aria-label="Machine state">${['registers','memory','stack','micro','history','output'].map(x=>`<button role="tab" aria-selected="${x==='registers'}" class="inspect-tab ${x==='registers'?'active':''}" data-inspect="${x}">${x==='micro'?'Micro':x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div><div class="inspector-body" id="inspector-body" role="tabpanel"></div></div>
  <p class="inspector-help">Return value appears in RAX when the function returns to the harness. Execution is bounded; Run stops after 10,000 instructions.</p></section></div>`);
  const renderC=()=>{const line=currentCLine();$$('#csource-body .cline').forEach(e=>e.classList.toggle('active',+e.dataset.line===line));const act=$('#csource-body .cline.active');if(act)act.scrollIntoView({block:'nearest'});};
  const updateCButtons=()=>{const stuck=['halted','fault'].includes(machine.status);['c-run','c-stepline','c-nextline','c-step','c-finish'].forEach(b=>{const el=$('#'+b);if(el)el.disabled=stuck;});$('#c-back').disabled=!machine.history.length;};
- const renderAll=()=>{renderDisassembly();renderInspector();updateStatus();updateCButtons();renderC();};
+ const renderMicro=()=>{
+  const el=$('#inspector-body'),steps=machine.steps;
+  if(!steps){el.innerHTML='<p class="inspector-help">Step or run to model cache, TLB, and branch behavior for this code.</p>';return;}
+  const m2=new Machine(programFromImage(l),l.input),mi=new Microarch();m2.run({limit:Math.min(steps,300000),onStep:mm=>mi.observe(mm)});
+  const s=mi.stats,dacc=s.loads+s.stores,pct=(a,b)=>b?Math.round(a/b*100)+'%':'—',cls=lv=>lv==='L1'?'ok':lv==='DRAM'?'bad':'mid';
+  let now=(mi.last?.accesses||[]).map(a=>`<div class="micro-now"><span>${a.write?'store':'load'} 0x${a.addr.toString(16)}</span><span class="lvl ${cls(a.level)}">${a.level}</span><span class="tlbm">TLB ${a.tlb==='walk'?'walk':a.tlb+' hit'}</span></div>`).join('');
+  if(mi.last?.branch)now+=`<div class="micro-now"><span>branch</span><span class="lvl ${mi.last.branch.correct?'ok':'bad'}">${mi.last.branch.correct?'predicted':'mispredict'}</span><span class="tlbm">${mi.last.branch.taken?'taken':'not taken'}</span></div>`;
+  if(!now)now='<div class="micro-now muted"><span>no data access or branch this instruction</span></div>';
+  el.innerHTML=`<div class="micro-head">This instruction</div>${now}<div class="micro-grid"><div><span>Modeled cycles</span><b>${mi.cycles.toLocaleString()}</b></div><div><span>Cycles / insn</span><b>${(mi.cycles/s.insns).toFixed(1)}</b></div><div><span>Data accesses</span><b>${dacc}</b></div><div><span>L1 hit rate</span><b>${pct(s.L1,dacc)}</b></div><div><span>L2 / L3 / DRAM</span><b>${s.L2} / ${s.L3} / ${s.DRAM}</b></div><div><span>TLB walks</span><b>${s.walks}</b></div><div><span>Branches</span><b>${s.branches}</b></div><div><span>Mispredict rate</span><b>${pct(s.mispred,s.branches)}</b></div></div><p class="inspector-help">Modeled on the 48 KiB L1d · 512 KiB L2 · 4 MiB L3 machine with a 64-entry DTLB and a bimodal predictor. Representative unloaded latencies for teaching — not a timing simulation.</p>`;
+ };
+ const renderInspect=()=>{if(inspectTab==='micro')renderMicro();else renderInspector();};
+ const renderAll=()=>{renderDisassembly();renderInspect();updateStatus();updateCButtons();renderC();};
  $('#c-restart').onclick=()=>{machine=new Machine(programFromImage(l),l.input);renderAll();};
  $('#c-run').onclick=()=>{machine.run({breakpoints});renderAll();};
  $('#c-step').onclick=()=>{machine.step();renderAll();};
@@ -962,7 +986,7 @@ function clab(id){
  $('#c-back').onclick=()=>{machine.rewind();renderAll();};
  $('#c-stepline').onclick=()=>{stepSourceLine(false);renderAll();};
  $('#c-nextline').onclick=()=>{stepSourceLine(true);renderAll();};
- $$('[data-inspect]').forEach(b=>b.onclick=()=>{inspectTab=b.dataset.inspect;$$('[data-inspect]').forEach(x=>{x.classList.toggle('active',x.dataset.inspect===inspectTab);x.setAttribute('aria-selected',String(x.dataset.inspect===inspectTab));});renderInspector();});
+ $$('[data-inspect]').forEach(b=>b.onclick=()=>{inspectTab=b.dataset.inspect;$$('[data-inspect]').forEach(x=>{x.classList.toggle('active',x.dataset.inspect===inspectTab);x.setAttribute('aria-selected',String(x.dataset.inspect===inspectTab));});renderInspect();});
  renderAll();
 }
 function progress(){shell('progress','Your progress',`<div class="page-title"><div class="eyebrow">YOUR INVESTIGATIONS</div><h1>Understanding, accumulated.</h1><p>${completed()} of ${lessons.length} runnable exercises verified. Completion records the exercise checks; it is not a certification of mastery.</p><div class="row wrap"><button class="btn primary" id="export-progress">${icon('download')}Export progress & code</button><button class="btn" id="import-progress">${icon('save')}Import progress</button><input type="file" id="progress-file" accept="application/json,.json" hidden></div></div><div class="progress-grid">${tracks.filter(t=>t.labs.length).map(t=>{const n=t.labs.filter(done).length;return `<a class="progress-item" href="#track/${t.id}"><h3>${t.title}</h3><progress max="${t.labs.length}" value="${n}" aria-label="${esc(t.title)} progress"></progress><div class="row spread"><span>${n} / ${t.labs.length} complete</span>${icon('arrow')}</div></a>`;}).join('')}</div><div class="section-head"><h2>Exercise ledger</h2></div><div class="lesson-list">${lessons.map((l,i)=>lessonLink(l,i)).join('')}</div><div class="notice"><strong>Portable by design.</strong> Export includes your source edits, inputs, quiz answers, and completion records. Import replaces this browser’s teard0wn data after confirmation. It never executes imported source automatically.</div>`);

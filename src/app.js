@@ -2,6 +2,7 @@ import {Machine,assemble,hex,unsigned,signed,REG64,CODE,DATA,STACK,exportGNU,pro
 import {tracks,trackById,prerequisite} from './curriculum.js';
 import {lessons,lessonById,sources,createFixture,verifyLesson} from './lessons.js';
 import {compiledLessons} from './compiled.js';
+import {Microarch} from './micro.js';
 
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -152,11 +153,22 @@ function clab(id){
  <div class="toolbar"><button class="btn" id="c-restart">${icon('reset')}Restart</button><button class="btn" id="c-run">${icon('play')}Run</button><button class="btn primary" id="c-stepline" title="Advance to the next C source line, descending into calls">${icon('step')}Step line</button><button class="btn" id="c-nextline" title="Next C source line, stepping over calls">${icon('over')}Next line</button><button class="btn" id="c-step" title="One machine instruction (stepi)">${icon('step')}Instr</button><button class="btn" id="c-finish" title="Run to the current function's return">${icon('finish')}Finish</button><button class="btn" id="c-back" title="Reverse one instruction">${icon('back')}Back</button></div>
  <div class="status-line" id="machine-status" role="status" aria-live="polite"></div>
  <div class="disassembly"><div class="box-head"><span>DISASSEMBLY</span><span>current instruction highlighted</span></div><div class="dis-scroll"><table class="dis-table"><tbody id="disassembly-rows"></tbody></table></div></div>
- <div class="inspector"><div class="inspect-tabs" role="tablist" aria-label="Machine state">${['registers','memory','stack','history','output'].map(x=>`<button role="tab" aria-selected="${x==='registers'}" class="inspect-tab ${x==='registers'?'active':''}" data-inspect="${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div><div class="inspector-body" id="inspector-body" role="tabpanel"></div></div>
+ <div class="inspector"><div class="inspect-tabs" role="tablist" aria-label="Machine state">${['registers','memory','stack','micro','history','output'].map(x=>`<button role="tab" aria-selected="${x==='registers'}" class="inspect-tab ${x==='registers'?'active':''}" data-inspect="${x}">${x==='micro'?'Micro':x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div><div class="inspector-body" id="inspector-body" role="tabpanel"></div></div>
  <p class="inspector-help">Return value appears in RAX when the function returns to the harness. Execution is bounded; Run stops after 10,000 instructions.</p></section></div>`);
  const renderC=()=>{const line=currentCLine();$$('#csource-body .cline').forEach(e=>e.classList.toggle('active',+e.dataset.line===line));const act=$('#csource-body .cline.active');if(act)act.scrollIntoView({block:'nearest'});};
  const updateCButtons=()=>{const stuck=['halted','fault'].includes(machine.status);['c-run','c-stepline','c-nextline','c-step','c-finish'].forEach(b=>{const el=$('#'+b);if(el)el.disabled=stuck;});$('#c-back').disabled=!machine.history.length;};
- const renderAll=()=>{renderDisassembly();renderInspector();updateStatus();updateCButtons();renderC();};
+ const renderMicro=()=>{
+  const el=$('#inspector-body'),steps=machine.steps;
+  if(!steps){el.innerHTML='<p class="inspector-help">Step or run to model cache, TLB, and branch behavior for this code.</p>';return;}
+  const m2=new Machine(programFromImage(l),l.input),mi=new Microarch();m2.run({limit:Math.min(steps,300000),onStep:mm=>mi.observe(mm)});
+  const s=mi.stats,dacc=s.loads+s.stores,pct=(a,b)=>b?Math.round(a/b*100)+'%':'—',cls=lv=>lv==='L1'?'ok':lv==='DRAM'?'bad':'mid';
+  let now=(mi.last?.accesses||[]).map(a=>`<div class="micro-now"><span>${a.write?'store':'load'} 0x${a.addr.toString(16)}</span><span class="lvl ${cls(a.level)}">${a.level}</span><span class="tlbm">TLB ${a.tlb==='walk'?'walk':a.tlb+' hit'}</span></div>`).join('');
+  if(mi.last?.branch)now+=`<div class="micro-now"><span>branch</span><span class="lvl ${mi.last.branch.correct?'ok':'bad'}">${mi.last.branch.correct?'predicted':'mispredict'}</span><span class="tlbm">${mi.last.branch.taken?'taken':'not taken'}</span></div>`;
+  if(!now)now='<div class="micro-now muted"><span>no data access or branch this instruction</span></div>';
+  el.innerHTML=`<div class="micro-head">This instruction</div>${now}<div class="micro-grid"><div><span>Modeled cycles</span><b>${mi.cycles.toLocaleString()}</b></div><div><span>Cycles / insn</span><b>${(mi.cycles/s.insns).toFixed(1)}</b></div><div><span>Data accesses</span><b>${dacc}</b></div><div><span>L1 hit rate</span><b>${pct(s.L1,dacc)}</b></div><div><span>L2 / L3 / DRAM</span><b>${s.L2} / ${s.L3} / ${s.DRAM}</b></div><div><span>TLB walks</span><b>${s.walks}</b></div><div><span>Branches</span><b>${s.branches}</b></div><div><span>Mispredict rate</span><b>${pct(s.mispred,s.branches)}</b></div></div><p class="inspector-help">Modeled on the 48 KiB L1d · 512 KiB L2 · 4 MiB L3 machine with a 64-entry DTLB and a bimodal predictor. Representative unloaded latencies for teaching — not a timing simulation.</p>`;
+ };
+ const renderInspect=()=>{if(inspectTab==='micro')renderMicro();else renderInspector();};
+ const renderAll=()=>{renderDisassembly();renderInspect();updateStatus();updateCButtons();renderC();};
  $('#c-restart').onclick=()=>{machine=new Machine(programFromImage(l),l.input);renderAll();};
  $('#c-run').onclick=()=>{machine.run({breakpoints});renderAll();};
  $('#c-step').onclick=()=>{machine.step();renderAll();};
@@ -164,7 +176,7 @@ function clab(id){
  $('#c-back').onclick=()=>{machine.rewind();renderAll();};
  $('#c-stepline').onclick=()=>{stepSourceLine(false);renderAll();};
  $('#c-nextline').onclick=()=>{stepSourceLine(true);renderAll();};
- $$('[data-inspect]').forEach(b=>b.onclick=()=>{inspectTab=b.dataset.inspect;$$('[data-inspect]').forEach(x=>{x.classList.toggle('active',x.dataset.inspect===inspectTab);x.setAttribute('aria-selected',String(x.dataset.inspect===inspectTab));});renderInspector();});
+ $$('[data-inspect]').forEach(b=>b.onclick=()=>{inspectTab=b.dataset.inspect;$$('[data-inspect]').forEach(x=>{x.classList.toggle('active',x.dataset.inspect===inspectTab);x.setAttribute('aria-selected',String(x.dataset.inspect===inspectTab));});renderInspect();});
  renderAll();
 }
 function progress(){shell('progress','Your progress',`<div class="page-title"><div class="eyebrow">YOUR INVESTIGATIONS</div><h1>Understanding, accumulated.</h1><p>${completed()} of ${lessons.length} runnable exercises verified. Completion records the exercise checks; it is not a certification of mastery.</p><div class="row wrap"><button class="btn primary" id="export-progress">${icon('download')}Export progress & code</button><button class="btn" id="import-progress">${icon('save')}Import progress</button><input type="file" id="progress-file" accept="application/json,.json" hidden></div></div><div class="progress-grid">${tracks.filter(t=>t.labs.length).map(t=>{const n=t.labs.filter(done).length;return `<a class="progress-item" href="#track/${t.id}"><h3>${t.title}</h3><progress max="${t.labs.length}" value="${n}" aria-label="${esc(t.title)} progress"></progress><div class="row spread"><span>${n} / ${t.labs.length} complete</span>${icon('arrow')}</div></a>`;}).join('')}</div><div class="section-head"><h2>Exercise ledger</h2></div><div class="lesson-list">${lessons.map((l,i)=>lessonLink(l,i)).join('')}</div><div class="notice"><strong>Portable by design.</strong> Export includes your source edits, inputs, quiz answers, and completion records. Import replaces this browser’s teard0wn data after confirmation. It never executes imported source automatically.</div>`);

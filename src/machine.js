@@ -188,7 +188,7 @@ export class Machine {
     this.program=program;this.regs=Array(16).fill(0n);this.regs[4]=BigInt(STACK);
     this.flags={CF:false,PF:false,AF:false,ZF:false,SF:false,OF:false};
     this.memory=new Uint8Array(0x10000);this.memory.set(program.code,CODE);this.memory.set(program.data,DATA);
-    this.rip=BigInt(program.entry);this.status='ready';this.reason='Ready at entry';this.steps=0;this.history=[];this.calls=[];this.output='';this.writes=[];
+    this.rip=BigInt(program.entry);this.status='ready';this.reason='Ready at entry';this.steps=0;this.history=[];this.calls=[];this.output='';this.writes=[];this.lastAccesses=[];this.lastBranch=null;
     for(const [name,value] of Object.entries(initial)){
       const r=REGS[name];if(!r)fail(`Unknown initial register ${name}.`);this.setReg(r.id,r.width,BigInt(value));
     }
@@ -203,8 +203,8 @@ export class Machine {
     if(mode==='execute'?!code:mode==='write'?!(data||stack):!(code||data||stack))fail(`${mode==='write'&&code?'Read-only code':mode==='execute'?'Non-executable or unmapped memory':'Unmapped memory'}: ${mode} at 0x${a.toString(16)}.`);
     return a;
   }
-  readMem(address,width){const a=this.range(address,width/8);let v=0n;for(let i=0;i<width/8;i++)v|=BigInt(this.memory[a+i])<<BigInt(i*8);return v;}
-  writeMem(address,width,value){const a=this.range(address,width/8,'write');for(let i=0;i<width/8;i++){const old=this.memory[a+i],next=Number((BigInt(value)>>BigInt(i*8))&255n);this.memory[a+i]=next;this.writes.push({address:a+i,old,value:next});}}
+  readMem(address,width){const a=this.range(address,width/8);if(this.lastAccesses)this.lastAccesses.push({address:a,width,write:false});let v=0n;for(let i=0;i<width/8;i++)v|=BigInt(this.memory[a+i])<<BigInt(i*8);return v;}
+  writeMem(address,width,value){const a=this.range(address,width/8,'write');if(this.lastAccesses)this.lastAccesses.push({address:a,width,write:true});for(let i=0;i<width/8;i++){const old=this.memory[a+i],next=Number((BigInt(value)>>BigInt(i*8))&255n);this.memory[a+i]=next;this.writes.push({address:a+i,old,value:next});}}
   read(o){return o.kind==='reg'?this.getReg(o.id,o.width):o.kind==='mem'?this.readMem(o.address,o.width):unsigned(o.value,o.width);}
   write(o,v){if(o.kind==='reg')this.setReg(o.id,o.width,v);else if(o.kind==='mem')this.writeMem(o.address,o.width,v);else fail('Invalid write destination.');}
   decode(){
@@ -295,7 +295,7 @@ export class Machine {
   rewind(){const h=this.history.pop();if(!h)return false;for(const w of [...h.writes].reverse())this.memory[w.address]=w.old;this.restore(h.before);this.writes=[];return true;}
   step(){
     if(['halted','fault'].includes(this.status))return false;
-    const before=this.snapshot();this.writes=[];
+    const before=this.snapshot();this.writes=[];this.lastAccesses=[];this.lastBranch=null;
     try{
       const d=this.decode(),[dst,src]=d.args,w=dst?.width;this.rip=d.next;this.status='paused';this.reason='Single instruction';
       const read=()=>this.read(dst),rhs=()=>this.read(src);
@@ -336,7 +336,7 @@ export class Machine {
         case 'call':this.regs[4]=unsigned(this.regs[4]-8n);this.writeMem(this.regs[4],64,d.next);this.calls.push({target:dst.value,returnTo:d.next,sp:this.regs[4]});this.rip=dst.value;break;
         case 'ret':{const target=this.readMem(this.regs[4],64);this.regs[4]=unsigned(this.regs[4]+8n);this.rip=target;this.calls.pop();if(target===BigInt(RETURN)){this.status='halted';this.reason='Returned to the lab harness';}break;}
         case 'jmp':this.rip=dst.value;break;
-        case 'jcc':if(this.condition(src.condition))this.rip=dst.value;break;
+        case 'jcc':{const taken=this.condition(src.condition);this.lastBranch={pc:Number(d.address),taken};if(taken)this.rip=dst.value;break;}
         case 'int3':this.reason='INT3 breakpoint';break;
         case 'nop':break;
         case 'syscall':{
@@ -356,11 +356,11 @@ export class Machine {
       this.status='fault';this.reason=e.message;this.history.push({before,writes:[],instruction:'fault'});if(this.history.length>512)this.history.shift();return false;
     }
   }
-  run({limit=10000,breakpoints=new Set(),watchpoints=new Set(),skipCurrent=true,until=null}={}){
+  run({limit=10000,breakpoints=new Set(),watchpoints=new Set(),skipCurrent=true,until=null,onStep=null}={}){
     let n=0;
     while(n<limit&&!['halted','fault'].includes(this.status)){
       if(breakpoints.has(Number(this.rip))&&(!skipCurrent||n>0)){this.status='paused';this.reason='Address breakpoint';break;}
-      if(!this.step())break;n++;
+      if(!this.step())break;n++;if(onStep)onStep(this);
       if(this.reason==='INT3 breakpoint')break;
       if(this.writes.some(x=>watchpoints.has(x.address))){this.reason='Memory write watchpoint';break;}
       if(until&&until(this)){this.status='paused';break;}

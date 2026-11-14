@@ -35,6 +35,16 @@ Initial RSP is 0x7ff8, holding the sentinel. A completed top-level RET advances 
 
 The flat map does not model page tables, TLBs, ASLR, a loader, caches, or permission-granularity behavior. Memory Systems Lab is the separate prerequisite for those mechanisms.
 
+## Modeled microarchitecture (overlay)
+
+Execution stays architectural: results never depend on timing. Separately, the compiled walkthroughs carry a microarchitecture overlay (the Micro tab) that watches the addresses and branches each instruction executes and models their behaviour on the Memory Systems Lab machine:
+
+- data caches — 48 KiB L1d (12-way), 512 KiB L2 (8-way), 4 MiB L3 (16-way), 64-byte lines, true LRU;
+- TLBs — 64-entry fully-associative L1 DTLB and a 512-entry L2 TLB over 4 KiB pages;
+- a 1024-entry two-bit bimodal branch predictor.
+
+It reports the per-instruction hit level, TLB outcome, and prediction, plus running totals and a modeled cycle count using representative unloaded latencies (L1 4, L2 12, L3 40, DRAM 200, mispredict 15, page walk 30). This is a locality-and-prediction teacher, not a timing simulator: no queueing, contention, memory-level parallelism, prefetching, or refresh, and the model never feeds back into execution. Its hit/miss behaviour is checked in `tests/micro.test.js`.
+
 ## Flags
 
 CF, PF, AF, ZF, SF, and OF are represented. Undefined results are null, rendered as `?`. A conditional branch depending on an undefined flag faults explicitly. This conservative behavior is a teaching choice; real hardware still has a bit value, but software may not rely on it when the architecture leaves it undefined.
