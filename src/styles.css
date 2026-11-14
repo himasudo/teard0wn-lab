@@ -56,3 +56,16 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .tso-cell.no span{color:var(--red)}
 .tso-cell.q{outline:2px solid var(--accent);outline-offset:1px}
 .tso-blurb{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+
+.mono{font-family:var(--mono)}
+.elf-card{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:16px;margin-bottom:14px}
+.elf-card h2{margin:0 0 8px;font-size:15px}
+.elf-split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.elf-split{grid-template-columns:1fr}}
+.elf-src{margin:0;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;font-family:var(--mono);font-size:12.5px;color:var(--text);overflow:auto}
+.elf-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.elf-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:4px 8px;border-bottom:1px solid var(--border)}
+.elf-table td{padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top}
+.elf-table td.mono,.elf-table .mono{font-family:var(--mono)}
+.elf-note{color:var(--muted);font-size:13px;line-height:1.55;margin:8px 0 0}
+.elf-bytes{font-family:var(--mono);font-size:12px;background:var(--surface2);padding:1px 6px;border-radius:5px;color:var(--accent)}

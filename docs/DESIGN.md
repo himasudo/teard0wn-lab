@@ -96,9 +96,14 @@ real CPU at three layers:
   FIFO store buffers, drain-to-memory, store-buffer-forwarding loads, MFENCE).
   The Concurrency section runs the classic litmus tests and marks each outcome
   allowed iff the model can reach it.
+- **Linking & loading.** `tools/elf_extract.py` captures the real ELF structure
+  of a dynamically-linked gcc build into `src/elfdata.js`; the Linking section
+  walks the header, segments, sections, the resolved vs PLT call, the relocation
+  behind the direct call, and PLT/GOT lazy binding — with a test asserting the
+  stub jumps through exactly the GOT slot the JUMP_SLOT relocation patches.
 
 ## Roadmap
 
-1. **Toolchain track.** An ELF/linking/PLT-GOT walkthrough.
-2. **Writable data / broader compiled support.** Load `.data`/`.bss` so mutable
-   globals run; decode SSE for vectorized `-O2` output.
+1. **Writable data / broader compiled support.** Load `.data`/`.bss` so mutable
+   globals run; decode SSE for vectorized `-O2` output. Both widen what the
+   compiled walkthroughs can show.
