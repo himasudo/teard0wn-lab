@@ -50,5 +50,18 @@
     "expect": "00000003",
     "retBits": 32,
     "intro": "The table is a static array in .bss, loaded writable at 0x2000. Open the Memory tab and step: the first loop zeroes the table, then each octal digit of x bumps a counter, so you see the array fill byte by byte. The return value is the largest count. For 511 (0o777) that is three."
+  },
+  {
+    "id": "c-float",
+    "file": "average3.c",
+    "entry": "average3",
+    "title": "Floating point in the XMM registers",
+    "subtitle": "Integers in, a double computed, an integer out.",
+    "track": "toolchain",
+    "inputLabel": "a, b, c (EDI, ESI, EDX)",
+    "input": { "rdi": 10, "rsi": 20, "rdx": 33 },
+    "expect": "00000015",
+    "retBits": 32,
+    "intro": "Floating point lives in the XMM registers, not the general-purpose ones. The integers are converted with cvtsi2sd, summed and divided with addsd/divsd, then truncated back with cvttsd2si. Watch xmm0 in the Registers tab hold the running double. For 10, 20, 33 the mean is 21."
   }
 ]

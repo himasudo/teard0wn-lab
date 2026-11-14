@@ -42,6 +42,10 @@ int mulc(int x){ return x * 1000003; }            /* imul r32,r/m32,imm32 (0x69)
 int subc(int x){ return x - 0x7eadbeef; }         /* accumulator sub eax,imm32 (0x2d) */
 unsigned andc(unsigned x){ return x & 0xcafef00du; } /* accumulator and eax,imm32 (0x25) */
 int xorc(int x){ return x ^ 0x12345678; }         /* accumulator xor eax,imm32 (0x35) */
+double favg(int a,int b){ return (a + b) / 2.0; }    /* cvtsi2sd, divsd -> xmm0 */
+double harm(int n){ double s=0; for(int i=1;i<=n;i++) s+=1.0/i; return s; } /* addsd/divsd loop */
+int scale3(int n){ double x=n; return (int)(x*1.5 + 0.5); }  /* mulsd, cvttsd2si */
+int fcmp(int a,int b){ double x=a*1.0, y=b*2.0; return x<y?1:0; } /* comisd branch */
 `;
 const DRIVER = `
 #include <stdio.h>
@@ -76,6 +80,10 @@ int main(int c,char**v){
   else if(!strcmp(f,"subc")) printf("%08x\\n",(uint32_t)subc(A));
   else if(!strcmp(f,"andc")) printf("%08x\\n",(uint32_t)andc((unsigned)A));
   else if(!strcmp(f,"xorc")) printf("%08x\\n",(uint32_t)xorc(A));
+  else if(!strcmp(f,"favg")){double d=favg(A,B);uint64_t u;memcpy(&u,&d,8);printf("%016llx\\n",(unsigned long long)u);}
+  else if(!strcmp(f,"harm")){double d=harm(A);uint64_t u;memcpy(&u,&d,8);printf("%016llx\\n",(unsigned long long)u);}
+  else if(!strcmp(f,"scale3")) printf("%08x\\n",(uint32_t)scale3(A));
+  else if(!strcmp(f,"fcmp")) printf("%08x\\n",(uint32_t)fcmp(A,B));
   else return 2;
   return 0;
 }
@@ -106,6 +114,10 @@ const PLAN = {
   subc:{ret:32,cases:[0,1,-1,2147483647,-2147483648].map(x=>[x])},
   andc:{ret:32,cases:[0,4294967295,0xcafef00d,0x0f0f0f0f].map(x=>[x])},
   xorc:{ret:32,cases:[0,4294967295,0x12345678,0xdeadbeef].map(x=>[x])},
+  favg:{ret:64,retReg:'xmm0',cases:[[3,5],[10,4],[-7,3],[0,0],[1,2]]},
+  harm:{ret:64,retReg:'xmm0',cases:[1,2,3,5,10].map(x=>[x])},
+  scale3:{ret:32,cases:[2,5,100,-4,0].map(x=>[x])},
+  fcmp:{ret:32,cases:[[1,1],[3,2],[2,3],[0,0]]},
 };
 const ARG=['rdi','rsi','rdx','rcx'];
 
@@ -148,7 +160,7 @@ function main(){
             // SIMD vectorization (e.g. -O2 128-bit stores) is an explicit boundary.
             if(/Unsupported 0F opcode 0x(6f|28|29|10|11|7e|d6|ef)/.test(m.reason)){ skipped++; total--; continue; }
             emu=`<${m.status}:${m.reason}>`;
-          } else emu=unsigned(m.regs[0],spec.ret).toString(16).padStart(spec.ret/4,'0');
+          } else emu=unsigned(spec.retReg==='xmm0'?m.xmm[0]:m.regs[0],spec.ret).toString(16).padStart(spec.ret/4,'0');
           if(emu!==nat){ fails++; if(fails<=20) console.log(`FAIL -O${OPT} ${fn}(${args}) native=${nat} emu=${emu}`); }
         }
       }

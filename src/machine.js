@@ -13,6 +13,12 @@ export const mask = w => (1n<<BigInt(w))-1n;
 export const unsigned = (x,w=64)=>BigInt.asUintN(w,BigInt(x));
 export const signed = (x,w=64)=>BigInt.asIntN(w,BigInt(x));
 export const hex = (x,digits=16)=>unsigned(x,digits*4).toString(16).padStart(digits,'0');
+// Reinterpret bits <-> IEEE-754 floats (x86 scalar SSE is binary32/binary64).
+const _fv = new DataView(new ArrayBuffer(8));
+export const bitsToF64 = b=>{_fv.setBigUint64(0,unsigned(b,64),true);return _fv.getFloat64(0,true);};
+export const f64ToBits = v=>{_fv.setFloat64(0,v,true);return _fv.getBigUint64(0,true);};
+export const bitsToF32 = b=>{_fv.setUint32(0,Number(unsigned(b,32)),true);return _fv.getFloat32(0,true);};
+export const f32ToBits = v=>{_fv.setFloat32(0,v,true);return BigInt(_fv.getUint32(0,true));};
 const le = (v,n)=>Array.from({length:n},(_,i)=>Number((BigInt(v)>>BigInt(8*i))&255n));
 const groups={add:0,or:1,and:4,sub:5,xor:6,cmp:7};
 const binBase={add:0x00,or:0x08,and:0x20,sub:0x28,xor:0x30,cmp:0x38};
@@ -259,6 +265,12 @@ export class Machine {
         const x=rm(128,true),r={kind:'xmm',id:x.field},store=(op2===0x29||op2===0x11||op2===0x7f);
         name='xmmmov';args=store?[x.operand,r]:[r,x.operand];
       }
+      else if((op2===0x10||op2===0x11)&&(mpfx==='f2'||mpfx==='f3')){const sz=mpfx==='f2'?64:32,x=rm(sz,true),r={kind:'xmm',id:x.field};name=mpfx==='f2'?'movsd':'movss';args=op2===0x11?[x.operand,r]:[r,x.operand];}
+      else if((op2===0x58||op2===0x59||op2===0x5c||op2===0x5e)&&(mpfx==='f2'||mpfx==='f3')){const sz=mpfx==='f2'?64:32,x=rm(sz,true);name=({88:'add',89:'mul',92:'sub',94:'div'})[op2]+(mpfx==='f2'?'sd':'ss');args=[{kind:'xmm',id:x.field},x.operand];}
+      else if(op2===0x2a&&(mpfx==='f2'||mpfx==='f3')){const x=rm(wide);name=mpfx==='f2'?'cvtsi2sd':'cvtsi2ss';args=[{kind:'xmm',id:x.field},x.operand];}
+      else if(op2===0x2c&&(mpfx==='f2'||mpfx==='f3')){const sz=mpfx==='f2'?64:32,x=rm(sz,true);name=mpfx==='f2'?'cvttsd2si':'cvttss2si';args=[reg(x.field,wide),x.operand];}
+      else if((op2===0x2e||op2===0x2f)&&(mpfx===null||mpfx==='66')){const sz=mpfx==='66'?64:32,x=rm(sz,true);name=mpfx==='66'?'comisd':'comiss';args=[{kind:'xmm',id:x.field},x.operand];}
+      else if(op2===0xef&&mpfx==='66'){const x=rm(128,true);name='pxor';args=[{kind:'xmm',id:x.field},x.operand];}
       else fail(`Unsupported 0F opcode 0x${op2.toString(16)}.`);
     }else if([0x88,0x89,0x8a,0x8b,0x8d].includes(op)){
       const w=[0x88,0x8a].includes(op)?8:wide,x=rm(w);name=op===0x8d?'lea':'mov';
@@ -305,7 +317,7 @@ export class Machine {
     if(['halted','fault'].includes(this.status))return false;
     const before=this.snapshot();this.writes=[];this.lastAccesses=[];this.lastBranch=null;
     try{
-      const d=this.decode(),[dst,src]=d.args,w=dst?.width;this.rip=d.next;this.status='paused';this.reason='Single instruction';
+      const d=this.decode(),[dst,src]=d.args,w=dst?.width,name=d.name;this.rip=d.next;this.status='paused';this.reason='Single instruction';
       const read=()=>this.read(dst),rhs=()=>this.read(src);
       switch(d.name){
         case 'mov':this.write(dst,rhs());break;
@@ -320,6 +332,22 @@ export class Machine {
         case 'movsx':this.write(dst,unsigned(signed(rhs(),src.width),w));break;
         case 'movsxd':this.write(dst,unsigned(signed(rhs(),32),w));break;
         case 'xmmmov':this.write(dst,rhs());break;
+        case 'movsd':case 'movss':{const sz=name==='movsd'?64:32;
+          if(dst.kind==='xmm'){const bits=src.kind==='xmm'?this.xmm[src.id]&mask(sz):this.readMem(src.address,sz);this.xmm[dst.id]=src.kind==='mem'?bits:(this.xmm[dst.id]&(mask(128)^mask(sz)))|bits;}
+          else this.writeMem(dst.address,sz,this.xmm[src.id]&mask(sz));break;}
+        case 'addsd':case 'subsd':case 'mulsd':case 'divsd':case 'addss':case 'subss':case 'mulss':case 'divss':{
+          const sd=name.endsWith('sd'),sz=sd?64:32,toF=sd?bitsToF64:bitsToF32,toB=sd?f64ToBits:f32ToBits;
+          const a=toF(this.xmm[dst.id]),sbits=src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,sz),b=toF(sbits),op=name.slice(0,3);
+          const r=op==='add'?a+b:op==='sub'?a-b:op==='mul'?a*b:a/b;
+          this.xmm[dst.id]=(this.xmm[dst.id]&(mask(128)^mask(sz)))|toB(r);break;}
+        case 'cvtsi2sd':case 'cvtsi2ss':{const sd=name.endsWith('sd'),sz=sd?64:32,r=Number(signed(this.read(src),src.width));
+          this.xmm[dst.id]=(this.xmm[dst.id]&(mask(128)^mask(sz)))|(sd?f64ToBits(r):f32ToBits(Math.fround(r)));break;}
+        case 'cvttsd2si':case 'cvttss2si':{const sd=name==='cvttsd2si',fv=(sd?bitsToF64:bitsToF32)(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,sd?64:32)),w=dst.width,v=Math.trunc(fv);
+          this.write(dst,(!Number.isFinite(v)||v<-(2**(w-1))||v>=2**(w-1))?1n<<BigInt(w-1):unsigned(BigInt(v),w));break;}
+        case 'comisd':case 'comiss':{const sd=name==='comisd',toF=sd?bitsToF64:bitsToF32,a=toF(this.xmm[dst.id]),b=toF(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,sd?64:32));
+          this.flags.OF=this.flags.SF=this.flags.AF=false;
+          if(Number.isNaN(a)||Number.isNaN(b)){this.flags.ZF=this.flags.PF=this.flags.CF=true;}else{this.flags.PF=false;this.flags.ZF=a===b;this.flags.CF=a<b;}break;}
+        case 'pxor':this.xmm[dst.id]=this.xmm[dst.id]^(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128));break;
         case 'cmov':if(this.condition(d.args[2].condition))this.write(dst,rhs());break;
         case 'setcc':this.write(dst,this.condition(src.condition)?1n:0n);break;
         case 'cdqe':{const half=w/2;this.setReg(0,w,unsigned(signed(this.getReg(0,half),half),w));break;}

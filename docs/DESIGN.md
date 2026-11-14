@@ -104,7 +104,9 @@ real CPU at three layers:
 
 ## Roadmap
 
-1. **SSE/FP arithmetic.** 128-bit SSE moves now run (so integer-vectorized init
-   and copy work); the remaining gap is SSE/x87 arithmetic and scalar
-   floating-point (`addsd`, `mulsd`, `cvtsi2sd`, …), which would let float
-   functions and vectorized loops execute.
+1. **Packed/vector arithmetic.** Scalar floating-point now runs (`movsd`,
+   `addsd`/`mulsd`/`divsd`, `cvtsi2sd`, `cvttsd2si`, `comisd`), bit-exact against
+   the host, and the Registers view shows the XMM file. The remaining gap is
+   *packed* SSE/AVX arithmetic (`paddd`, `addps`, …) and x87, which would let
+   vectorized floating-point loops execute. Between the single-threaded engine
+   and the scalar FP, essentially any scalar C function now runs.
