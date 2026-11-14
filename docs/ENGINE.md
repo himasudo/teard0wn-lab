@@ -45,6 +45,10 @@ Execution stays architectural: results never depend on timing. Separately, the c
 
 It reports the per-instruction hit level, TLB outcome, and prediction, plus running totals and a modeled cycle count using representative unloaded latencies (L1 4, L2 12, L3 40, DRAM 200, mispredict 15, page walk 30). This is a locality-and-prediction teacher, not a timing simulator: no queueing, contention, memory-level parallelism, prefetching, or refresh, and the model never feeds back into execution. Its hit/miss behaviour is checked in `tests/micro.test.js`.
 
+## Coverage-guided fuzzing
+
+`src/fuzzer.js` runs a compiled target with a 32-bit input and takes the set of instruction addresses the run executed as its coverage. It keeps any input that reaches a new address and mutates from that corpus, so it works through byte-compared gates one at a time; a crash is an engine fault. On the byte-gated target this finds the single crashing input in the low thousands of executions, against a 2^32 space. `tests/fuzzer.test.js` checks that the gated input is found and that the known crash faults while a benign input does not.
+
 ## Flags
 
 CF, PF, AF, ZF, SF, and OF are represented. Undefined results are null, rendered as `?`. A conditional branch depending on an undefined flag faults explicitly. This conservative behavior is a teaching choice; real hardware still has a bit value, but software may not rely on it when the architecture leaves it undefined.

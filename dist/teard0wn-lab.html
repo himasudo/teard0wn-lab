@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101414">
   <meta name="description" content="Take systems apart. An original systems and security laboratory with lessons, editable assembly, and an inspectable x86-64 teaching engine.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-ii3J5ZSCHd41pLLmq1xhquYT8ou4u0FcAKlLKn13Br8='; style-src 'sha256-j9ex12+5MzBOaXN7QudZLBhW5usQu4IyAiQKU2Sm0oU='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-EH10z99wS8SX0780/DHWZy328MeBJs5IAexPzGW3c24='; style-src 'sha256-bcTHOAEAPM/dyrWhUscP7HSRQ5PbpCkljkLc85mVqxQ='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>teard0wn lab — Understand every layer</title>
   <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTIiIGZpbGw9IiNkNGY3NmIiLz48cGF0aCBkPSJNMTYgMTMgNyAyNGw5IDExTTMyIDEzbDkgMTEtOSAxMU0yNyAxMWwtNiAyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTUxYjEzIiBzdHJva2Utd2lkdGg9IjMuMyIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPgo=" type="image/svg+xml">
   <style>@font-face{font-family:LabSans;src:local('Inter'),local('Arial');font-display:swap}
@@ -40,6 +40,10 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .micro-grid>div{display:flex;flex-direction:column;gap:2px;padding:7px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
 .micro-grid span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .micro-grid b{font-family:var(--mono);font-size:15px;color:var(--text)}
+
+.dis-table tr.covered td{background:var(--surface3)}
+.dis-table tr.covered .insn{color:var(--accent)}
+.fz-stats{margin:10px 0}
 </style>
   <script type="module">// machine.js
 // teard0wn x86-64 teaching engine. Encodes and decodes real instruction bytes.
@@ -313,6 +317,9 @@ class Machine {
       name=(op===0xfe?{0:'inc',1:'dec'}:{0:'inc',1:'dec',2:'callind',4:'jmpind',6:'pushind'})[x.field];
       if(!name)fail('Unsupported FE/FF group.');args=[x.operand];
     }else if(op===0xc0||op===0xc1){const w=op===0xc0?8:wide,x=rm(w);name=({4:'shl',5:'shr',7:'sar'})[x.field];if(!name)fail('Unsupported shift.');args=[x.operand,{kind:'imm',width:8,value:imm(1)}];}
+    else if(op===0xa8||op===0xa9){const w=op===0xa8?8:wide;name='test';args=[reg(0,w),{kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)}];}
+    else if(op===0x69||op===0x6b){const x=rm(wide),immv=op===0x6b?imm(1,true):imm(Math.min(wide,32)/8,wide===64);name='imul3';args=[reg(x.field,wide),x.operand,{kind:'imm',width:wide,value:immv}];}
+    else if(Object.keys(binBase).some(k=>op===binBase[k]+4||op===binBase[k]+5)){const g=Object.keys(binBase).find(k=>op===binBase[k]+4||op===binBase[k]+5),w=op===binBase[g]+4?8:wide;name=g;args=[reg(0,w),{kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)}];}
     else{
       const group=Object.keys(binBase).find(k=>op>=binBase[k]&&op<=binBase[k]+3);
       if(!group)fail(`Unsupported opcode 0x${op.toString(16)} at 0x${Number(this.rip).toString(16)}.`);
@@ -363,6 +370,7 @@ class Machine {
         case 'xchg':{const a=read(),b=rhs();this.write(dst,b);this.write(src,a);break;}
         case 'mul':{const a=this.getReg(0,w),b=read(),prod=a*b;if(w===8)this.setReg(0,16,prod&0xffffn);else{this.setReg(0,w,prod&mask(w));this.setReg(2,w,(prod>>BigInt(w))&mask(w));}this.flags.CF=this.flags.OF=(prod>>BigInt(w))!==0n;for(const f of['SF','ZF','AF','PF'])this.flags[f]=null;break;}
         case 'imul1':{const prod=signed(this.getReg(0,w),w)*signed(read(),w),lo=unsigned(prod,w);if(w===8)this.setReg(0,16,unsigned(prod,16));else{this.setReg(0,w,lo);this.setReg(2,w,unsigned(prod>>BigInt(w),w));}this.flags.CF=this.flags.OF=signed(lo,w)!==prod;for(const f of['SF','ZF','AF','PF'])this.flags[f]=null;break;}
+        case 'imul3':{const r=signed(rhs(),w)*signed(d.args[2].value,w);this.write(dst,r);this.flags.CF=this.flags.OF=signed(r,w)!==r;for(const f of['SF','ZF','AF','PF'])this.flags[f]=null;break;}
         case 'div':{const b=read();if(b===0n)fail('Integer divide by zero.');const dividend=w===8?this.getReg(0,16):(this.getReg(2,w)<<BigInt(w))|this.getReg(0,w),q=dividend/b,r=dividend%b;if(q>mask(w))fail('Divide overflow (quotient too large).');if(w===8)this.setReg(0,16,(r<<8n)|q);else{this.setReg(0,w,q);this.setReg(2,w,r);}for(const f of['CF','OF','SF','ZF','AF','PF'])this.flags[f]=null;break;}
         case 'idiv':{const b=signed(read(),w);if(b===0n)fail('Integer divide by zero.');const dividend=w===8?signed(this.getReg(0,16),16):signed((this.getReg(2,w)<<BigInt(w))|this.getReg(0,w),w*2),q=dividend/b,r=dividend%b;if(q<-(1n<<BigInt(w-1))||q>(1n<<BigInt(w-1))-1n)fail('Divide overflow (signed quotient out of range).');if(w===8)this.setReg(0,16,(unsigned(r,8)<<8n)|unsigned(q,8));else{this.setReg(0,w,unsigned(q,w));this.setReg(2,w,unsigned(r,w));}for(const f of['CF','OF','SF','ZF','AF','PF'])this.flags[f]=null;break;}
         case 'callind':{const target=read();this.regs[4]=unsigned(this.regs[4]-8n);this.writeMem(this.regs[4],64,d.next);this.calls.push({target,returnTo:d.next,sp:this.regs[4]});this.rip=target;break;}
@@ -812,18 +820,164 @@ function verifyLesson(Machine,assemble,lesson,source,input){
 // Generated by tools/compile_lesson.py from lessons/compiled/. Do not edit by hand.
 const compiledLessons = [{"id":"c-classify","title":"Branches under a compiler","subtitle":"Watch two if-statements become compares and jumps.","track":"toolchain","inputLabel":"x (EDI)","input":{"rdi":7},"expect":"00000001","retBits":32,"intro":"Three lines of C, each a branch. Step by source line to watch control flow, then step by instruction to see each CMP set the flags a Jcc reads. The sign of x decides the first branch; the zero test decides the second.","source":["int classify(int x)","{","    if (x < 0)","        return -1;","    if (x == 0)","        return 0;","    return 1;","}"],"base":4096,"entry":4096,"codeHex":"554889e5897dfc837dfc007907b8ffffffffeb12837dfc007507b800000000eb05b8010000005dc3","insns":[{"addr":4096,"bytes":"55","text":"push rbp","line":2},{"addr":4097,"bytes":"48 89 e5","text":"mov rbp,rsp","line":2},{"addr":4100,"bytes":"89 7d fc","text":"mov DWORD PTR [rbp-0x4],edi","line":2},{"addr":4103,"bytes":"83 7d fc 00","text":"cmp DWORD PTR [rbp-0x4],0x0","line":3},{"addr":4107,"bytes":"79 07","text":"jns 1014 <classify+0x14>","line":3},{"addr":4109,"bytes":"b8 ff ff ff ff","text":"mov eax,0xffffffff","line":4},{"addr":4114,"bytes":"eb 12","text":"jmp 1026 <classify+0x26>","line":4},{"addr":4116,"bytes":"83 7d fc 00","text":"cmp DWORD PTR [rbp-0x4],0x0","line":5},{"addr":4120,"bytes":"75 07","text":"jne 1021 <classify+0x21>","line":5},{"addr":4122,"bytes":"b8 00 00 00 00","text":"mov eax,0x0","line":6},{"addr":4127,"bytes":"eb 05","text":"jmp 1026 <classify+0x26>","line":6},{"addr":4129,"bytes":"b8 01 00 00 00","text":"mov eax,0x1","line":7},{"addr":4134,"bytes":"5d","text":"pop rbp","line":8},{"addr":4135,"bytes":"c3","text":"ret","line":8}]},{"id":"c-sum-to","title":"A loop, instruction by instruction","subtitle":"One C for-loop; count the back-edges.","track":"toolchain","inputLabel":"n (EDI)","input":{"rdi":5},"expect":"0000000f","retBits":32,"intro":"The accumulator lives in a register; the loop counter is compared each turn. Step by line to ride the loop, or by instruction to see the increment, the compare, and the conditional back-edge that the C for-header hides.","source":["unsigned sum_to(unsigned n)","{","    unsigned s = 0;","    for (unsigned i = 1; i <= n; i++)","        s += i;","    return s;","}"],"base":4096,"entry":4096,"codeHex":"554889e5897decc745fc00000000c745f801000000eb0a8b45f80145fc8345f8018b45f83945ec73ee8b45fc5dc3","insns":[{"addr":4096,"bytes":"55","text":"push rbp","line":2},{"addr":4097,"bytes":"48 89 e5","text":"mov rbp,rsp","line":2},{"addr":4100,"bytes":"89 7d ec","text":"mov DWORD PTR [rbp-0x14],edi","line":2},{"addr":4103,"bytes":"c7 45 fc 00 00 00 00","text":"mov DWORD PTR [rbp-0x4],0x0","line":3},{"addr":4110,"bytes":"c7 45 f8 01 00 00 00","text":"mov DWORD PTR [rbp-0x8],0x1","line":4},{"addr":4117,"bytes":"eb 0a","text":"jmp 1021 <sum_to+0x21>","line":4},{"addr":4119,"bytes":"8b 45 f8","text":"mov eax,DWORD PTR [rbp-0x8]","line":5},{"addr":4122,"bytes":"01 45 fc","text":"add DWORD PTR [rbp-0x4],eax","line":5},{"addr":4125,"bytes":"83 45 f8 01","text":"add DWORD PTR [rbp-0x8],0x1","line":4},{"addr":4129,"bytes":"8b 45 f8","text":"mov eax,DWORD PTR [rbp-0x8]","line":4},{"addr":4132,"bytes":"39 45 ec","text":"cmp DWORD PTR [rbp-0x14],eax","line":4},{"addr":4135,"bytes":"73 ee","text":"jae 1017 <sum_to+0x17>","line":4},{"addr":4137,"bytes":"8b 45 fc","text":"mov eax,DWORD PTR [rbp-0x4]","line":6},{"addr":4140,"bytes":"5d","text":"pop rbp","line":7},{"addr":4141,"bytes":"c3","text":"ret","line":7}]},{"id":"c-fib","title":"Recursion on the real stack","subtitle":"Step into a call; finish out of it.","track":"toolchain","inputLabel":"n (EDI)","input":{"rdi":10},"expect":"00000037","retBits":32,"intro":"Each call pushes a return address and a frame. Use Step line to descend into fib(n-1), Finish to run a call to its return, and the stack view to watch the frames pile up and unwind.","source":["int fib(int n)","{","    if (n < 2)","        return n;","    return fib(n - 1) + fib(n - 2);","}"],"base":4096,"entry":4096,"codeHex":"554889e5534883ec18897dec837dec017f058b45eceb1e8b45ec83e80189c7e8dcffffff89c38b45ec83e80289c7e8cdffffff01d8488b5df8c9c3","insns":[{"addr":4096,"bytes":"55","text":"push rbp","line":2},{"addr":4097,"bytes":"48 89 e5","text":"mov rbp,rsp","line":2},{"addr":4100,"bytes":"53","text":"push rbx","line":2},{"addr":4101,"bytes":"48 83 ec 18","text":"sub rsp,0x18","line":2},{"addr":4105,"bytes":"89 7d ec","text":"mov DWORD PTR [rbp-0x14],edi","line":2},{"addr":4108,"bytes":"83 7d ec 01","text":"cmp DWORD PTR [rbp-0x14],0x1","line":3},{"addr":4112,"bytes":"7f 05","text":"jg 1017 <fib+0x17>","line":3},{"addr":4114,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":4},{"addr":4117,"bytes":"eb 1e","text":"jmp 1035 <fib+0x35>","line":4},{"addr":4119,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":5},{"addr":4122,"bytes":"83 e8 01","text":"sub eax,0x1","line":5},{"addr":4125,"bytes":"89 c7","text":"mov edi,eax","line":5},{"addr":4127,"bytes":"e8 dc ff ff ff","text":"call 1000 <fib>","line":5},{"addr":4132,"bytes":"89 c3","text":"mov ebx,eax","line":5},{"addr":4134,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":5},{"addr":4137,"bytes":"83 e8 02","text":"sub eax,0x2","line":5},{"addr":4140,"bytes":"89 c7","text":"mov edi,eax","line":5},{"addr":4142,"bytes":"e8 cd ff ff ff","text":"call 1000 <fib>","line":5},{"addr":4147,"bytes":"01 d8","text":"add eax,ebx","line":5},{"addr":4149,"bytes":"48 8b 5d f8","text":"mov rbx,QWORD PTR [rbp-0x8]","line":6},{"addr":4153,"bytes":"c9","text":"leave","line":6},{"addr":4154,"bytes":"c3","text":"ret","line":6}]}];
 
+// micro.js
+// A small, explicit microarchitecture model: data caches, TLBs, and a branch
+// predictor, driven by the addresses and branches the engine actually executes.
+// Sizes follow the Memory Systems Lab's model machine. Latencies are
+// REPRESENTATIVE UNLOADED cycle counts for teaching, not measurements of any
+// real processor and not a timing simulation (no queueing, contention, MLP, or
+// prefetch). The point is to make locality and prediction visible, not to
+// predict wall-clock time.
+
+const LINE = 64;        // cache line / coherence granule, bytes
+const PAGE = 4096;      // page size, bytes
+
+// Representative unloaded latencies, in cycles.
+const LAT = {base:1, L1:4, L2:12, L3:40, DRAM:200, tlbL2:7, walk:30, mispredict:15};
+
+// Set-associative cache with true LRU. `unit` is the block size (LINE for data,
+// PAGE for a TLB). `entries` total blocks; `ways` associativity (ways===entries
+// gives a fully-associative structure with one set).
+class SetAssoc {
+  constructor(entries, ways, unit) {
+    this.ways = ways; this.unit = unit; this.sets = entries / ways;
+    if (!Number.isInteger(this.sets)) throw new Error('entries must be a multiple of ways');
+    this.reset();
+  }
+  reset() { this.tag = Array.from({length: this.sets}, () => []); } // [0] = most-recent
+  // Access the block containing `addr`; returns true on hit. LRU updated, with
+  // one block installed on a miss.
+  access(addr) {
+    const block = Math.floor(addr / this.unit);
+    const set = ((block % this.sets) + this.sets) % this.sets;
+    const tag = Math.floor(block / this.sets);
+    const line = this.tag[set];
+    const i = line.indexOf(tag);
+    if (i >= 0) { line.splice(i, 1); line.unshift(tag); return true; }
+    line.unshift(tag); if (line.length > this.ways) line.pop();
+    return false;
+  }
+}
+
+class Microarch {
+  constructor() {
+    // Data cache hierarchy (model machine): 48 KiB L1d 12-way, 512 KiB L2 8-way,
+    // 4 MiB L3 16-way. Accessing a level installs on miss, modelling inclusive fills.
+    this.L1 = new SetAssoc(768, 12, LINE);     // 48 KiB
+    this.L2 = new SetAssoc(8192, 8, LINE);     // 512 KiB
+    this.L3 = new SetAssoc(65536, 16, LINE);   // 4 MiB
+    // TLBs: 64-entry fully-associative L1 DTLB, 512-entry 8-way L2 TLB, 4 KiB pages.
+    this.dtlb = new SetAssoc(64, 64, PAGE);
+    this.stlb = new SetAssoc(512, 8, PAGE);
+    // Branch predictor: 1024-entry 2-bit bimodal (counter 0..3, >=2 predicts taken).
+    this.bp = new Uint8Array(1024).fill(1);
+    this.reset();
+  }
+  reset() {
+    for (const c of [this.L1, this.L2, this.L3, this.dtlb, this.stlb]) c.reset();
+    this.bp.fill(1);
+    this.cycles = 0;
+    this.stats = {insns:0, loads:0, stores:0, L1:0, L2:0, L3:0, DRAM:0,
+                  tlbHit:0, tlbL2:0, walks:0, branches:0, mispred:0};
+    this.last = null; // per-step summary for the UI
+  }
+  _data(addr, write) {
+    // Translate first, then look up the line.
+    let tlb;
+    if (this.dtlb.access(addr)) { tlb = 'L1'; this.stats.tlbHit++; }
+    else if (this.stlb.access(addr)) { tlb = 'L2'; this.stats.tlbL2++; this.cycles += LAT.tlbL2; }
+    else { tlb = 'walk'; this.stats.walks++; this.cycles += LAT.walk; }
+    let level;
+    if (this.L1.access(addr)) { level = 'L1'; this.cycles += LAT.L1; }
+    else if (this.L2.access(addr)) { level = 'L2'; this.cycles += LAT.L2; }
+    else if (this.L3.access(addr)) { level = 'L3'; this.cycles += LAT.L3; }
+    else { level = 'DRAM'; this.cycles += LAT.DRAM; }
+    this.stats[level]++;
+    this.stats[write ? 'stores' : 'loads']++;
+    return {addr, write, level, tlb};
+  }
+  _branch(pc, taken) {
+    const i = (pc >>> 0) & 1023, c = this.bp[i], predicted = c >= 2, correct = predicted === taken;
+    this.bp[i] = taken ? Math.min(3, c + 1) : Math.max(0, c - 1);
+    this.stats.branches++;
+    if (!correct) { this.stats.mispred++; this.cycles += LAT.mispredict; }
+    return {pc, taken, predicted, correct};
+  }
+  // Observe one retired instruction from the engine (see machine step records).
+  observe(machine) {
+    this.stats.insns++; this.cycles += LAT.base;
+    const accesses = (machine.lastAccesses || []).map(a => this._data(a.address, a.write));
+    const branch = machine.lastBranch ? this._branch(machine.lastBranch.pc, machine.lastBranch.taken) : null;
+    this.last = {accesses, branch};
+    return this.last;
+  }
+}
+
+// fuzz.js
+// Generated by tools/compile_lesson.py from lessons/fuzz/. Do not edit by hand.
+const fuzzTargets = [{"id":"f-crackme","title":"Byte-gated crackme","subtitle":"Four 1-in-256 gates, then a crash. Coverage guidance cracks it a byte at a time.","track":"fuzzing","inputLabel":"x (EDI)","input":{"rdi":0},"expect":"00000000","retBits":32,"intro":"Each gate compares one byte of the input. A blind fuzzer would need 2^32 tries; a coverage-guided fuzzer keeps every input that reaches a new gate and mutates from there, so it falls through in the low thousands. The last gate divides by zero -- the fault the fuzzer is hunting.","source":["/* A byte-gated target: random inputs almost never get past the first check,","   but a coverage-guided fuzzer keeps each input that reaches a new gate and","   mutates from there, cracking it one byte at a time. The final gate divides","   by zero, which the engine reports as a fault the fuzzer can find. */","int crackme(unsigned x)","{","    unsigned char b0 = x, b1 = x >> 8, b2 = x >> 16, b3 = x >> 24;","    if (b0 != 0x37)","        return 0;","    if (b1 != 0x13)","        return 1;","    if (b2 != 0x42)","        return 2;","    if (b3 != 0x42)","        return 3;","    int z = (int)x - 0x42421337;   /* runtime value, zero only for the magic input */","    return 1000000 / z;            /* divide by zero when x == 0x42421337 */","}"],"base":4096,"entry":4096,"codeHex":"554889e5897dec8b45ec8845ff8b45ecc1e8088845fe8b45ecc1e8108845fd8b45ecc1e8188845fc807dff377407b800000000eb3b807dfe137407b801000000eb2e807dfd427407b802000000eb21807dfc427407b803000000eb148b45ec2d371342428945f8b840420f0099f77df85dc3","insns":[{"addr":4096,"bytes":"55","text":"push rbp","line":6},{"addr":4097,"bytes":"48 89 e5","text":"mov rbp,rsp","line":6},{"addr":4100,"bytes":"89 7d ec","text":"mov DWORD PTR [rbp-0x14],edi","line":6},{"addr":4103,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":7},{"addr":4106,"bytes":"88 45 ff","text":"mov BYTE PTR [rbp-0x1],al","line":7},{"addr":4109,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":7},{"addr":4112,"bytes":"c1 e8 08","text":"shr eax,0x8","line":7},{"addr":4115,"bytes":"88 45 fe","text":"mov BYTE PTR [rbp-0x2],al","line":7},{"addr":4118,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":7},{"addr":4121,"bytes":"c1 e8 10","text":"shr eax,0x10","line":7},{"addr":4124,"bytes":"88 45 fd","text":"mov BYTE PTR [rbp-0x3],al","line":7},{"addr":4127,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":7},{"addr":4130,"bytes":"c1 e8 18","text":"shr eax,0x18","line":7},{"addr":4133,"bytes":"88 45 fc","text":"mov BYTE PTR [rbp-0x4],al","line":7},{"addr":4136,"bytes":"80 7d ff 37","text":"cmp BYTE PTR [rbp-0x1],0x37","line":8},{"addr":4140,"bytes":"74 07","text":"je 1035 <crackme+0x35>","line":8},{"addr":4142,"bytes":"b8 00 00 00 00","text":"mov eax,0x0","line":9},{"addr":4147,"bytes":"eb 3b","text":"jmp 1070 <crackme+0x70>","line":9},{"addr":4149,"bytes":"80 7d fe 13","text":"cmp BYTE PTR [rbp-0x2],0x13","line":10},{"addr":4153,"bytes":"74 07","text":"je 1042 <crackme+0x42>","line":10},{"addr":4155,"bytes":"b8 01 00 00 00","text":"mov eax,0x1","line":11},{"addr":4160,"bytes":"eb 2e","text":"jmp 1070 <crackme+0x70>","line":11},{"addr":4162,"bytes":"80 7d fd 42","text":"cmp BYTE PTR [rbp-0x3],0x42","line":12},{"addr":4166,"bytes":"74 07","text":"je 104f <crackme+0x4f>","line":12},{"addr":4168,"bytes":"b8 02 00 00 00","text":"mov eax,0x2","line":13},{"addr":4173,"bytes":"eb 21","text":"jmp 1070 <crackme+0x70>","line":13},{"addr":4175,"bytes":"80 7d fc 42","text":"cmp BYTE PTR [rbp-0x4],0x42","line":14},{"addr":4179,"bytes":"74 07","text":"je 105c <crackme+0x5c>","line":14},{"addr":4181,"bytes":"b8 03 00 00 00","text":"mov eax,0x3","line":15},{"addr":4186,"bytes":"eb 14","text":"jmp 1070 <crackme+0x70>","line":15},{"addr":4188,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":16},{"addr":4191,"bytes":"2d 37 13 42 42","text":"sub eax,0x42421337","line":16},{"addr":4196,"bytes":"89 45 f8","text":"mov DWORD PTR [rbp-0x8],eax","line":16},{"addr":4199,"bytes":"b8 40 42 0f 00","text":"mov eax,0xf4240","line":17},{"addr":4204,"bytes":"99","text":"cdq","line":17},{"addr":4205,"bytes":"f7 7d f8","text":"idiv DWORD PTR [rbp-0x8]","line":17},{"addr":4208,"bytes":"5d","text":"pop rbp","line":18},{"addr":4209,"bytes":"c3","text":"ret","line":18}]},{"id":"f-modhash","title":"Shallow divide-by-zero","subtitle":"One scramble, one bad divisor. Found fast, with or without coverage.","track":"fuzzing","inputLabel":"x (EDI)","input":{"rdi":0},"expect":"ffffffee","retBits":32,"intro":"No gates here: roughly one input in 256 scrambles to the divisor value that divides by zero. Fuzzing finds it quickly, which is the point of the contrast -- depth, not just the presence of a bug, is what makes coverage guidance matter.","source":["/* A shallow bug: one scramble, then a divide whose divisor is zero for a","   single scrambled byte value. No gates, so even undirected fuzzing finds it","   quickly -- a contrast with the byte-gated crackme. */","int modhash(unsigned x)","{","    unsigned a = (x * 2654435761u) >> 24;   /* scramble to a byte */","    int d = (int)a - 0x5a;","    return 1000 / d;                         /* divide by zero when a == 0x5a */","}"],"base":4096,"entry":4096,"codeHex":"554889e5897dec8b45ec69c0b179379ec1e8188945fc8b45fc83e85a8945f8b8e803000099f77df85dc3","insns":[{"addr":4096,"bytes":"55","text":"push rbp","line":5},{"addr":4097,"bytes":"48 89 e5","text":"mov rbp,rsp","line":5},{"addr":4100,"bytes":"89 7d ec","text":"mov DWORD PTR [rbp-0x14],edi","line":5},{"addr":4103,"bytes":"8b 45 ec","text":"mov eax,DWORD PTR [rbp-0x14]","line":6},{"addr":4106,"bytes":"69 c0 b1 79 37 9e","text":"imul eax,eax,0x9e3779b1","line":6},{"addr":4112,"bytes":"c1 e8 18","text":"shr eax,0x18","line":6},{"addr":4115,"bytes":"89 45 fc","text":"mov DWORD PTR [rbp-0x4],eax","line":6},{"addr":4118,"bytes":"8b 45 fc","text":"mov eax,DWORD PTR [rbp-0x4]","line":7},{"addr":4121,"bytes":"83 e8 5a","text":"sub eax,0x5a","line":7},{"addr":4124,"bytes":"89 45 f8","text":"mov DWORD PTR [rbp-0x8],eax","line":7},{"addr":4127,"bytes":"b8 e8 03 00 00","text":"mov eax,0x3e8","line":8},{"addr":4132,"bytes":"99","text":"cdq","line":8},{"addr":4133,"bytes":"f7 7d f8","text":"idiv DWORD PTR [rbp-0x8]","line":8},{"addr":4136,"bytes":"5d","text":"pop rbp","line":9},{"addr":4137,"bytes":"c3","text":"ret","line":9}]}];
+
+// fuzzer.js
+// A small coverage-guided fuzzer over the engine. It runs a compiled target
+// with a 32-bit input in EDI, records the set of instruction addresses the run
+// executed as its coverage, and keeps any input that reached a new address.
+// Mutating from that growing corpus lets it fall through byte-at-a-time gates
+// that blind random search could never pass. A crash is an engine fault
+// (out-of-bounds access, divide by zero, ...).
+
+// Execute one input; return the covered instruction addresses and whether it faulted.
+function coverageRun(program,input){
+  const m=new Machine(program,{rdi:unsigned(BigInt(input>>>0),64)});
+  const cov=new Set();let budget=100000;
+  while(budget-->0&&!['halted','fault'].includes(m.status)){cov.add(Number(m.rip));if(!m.step())break;}
+  return {cov,fault:m.status==='fault',reason:m.reason,ret:Number(unsigned(m.regs[0],32))};
+}
+
+// Mutate a 32-bit value. Byte substitution dominates, which is what cracks
+// byte-compared gates; bit flips and small deltas cover arithmetic conditions.
+function mutate(x,rng=Math.random){
+  x=x>>>0;const r=rng();
+  if(r<0.5){const sh=(r*8|0)%4*8,val=(rng()*256)|0;return ((x&~(0xff<<sh))|(val<<sh))>>>0;}
+  if(r<0.8)return (x^(1<<((rng()*32)|0)))>>>0;
+  if(r<0.95)return (x+((rng()*5|0)-2))>>>0;
+  return (rng()*0x100000000)>>>0;
+}
+
+class Fuzzer{
+  constructor(lesson,{rng=Math.random}={}){
+    this.program=programFromImage(lesson);this.rng=rng;
+    const seed=(Object.values(lesson.input)[0]|0)>>>0;
+    this.corpus=[seed];this.global=new Set();this.execs=0;this.crash=null;this.lastInput=seed;this.lastCov=new Set();this.corpusGrewAt=[];
+    const r=coverageRun(this.program,seed);this.execs++;this.lastCov=r.cov;
+    for(const a of r.cov)this.global.add(a);
+    if(r.fault)this.crash={input:seed,reason:r.reason};
+  }
+  // Run a batch; returns the crash record once found.
+  step(iters=1000){
+    for(let i=0;i<iters&&!this.crash;i++){
+      const base=this.corpus[(this.rng()*this.corpus.length)|0];
+      const input=mutate(base,this.rng);
+      const r=coverageRun(this.program,input);this.execs++;this.lastInput=input;this.lastCov=r.cov;
+      if(r.fault){this.crash={input,reason:r.reason,cov:[...r.cov]};break;}
+      let gained=false;for(const a of r.cov)if(!this.global.has(a)){this.global.add(a);gained=true;}
+      if(gained){this.corpus.push(input);this.corpusGrewAt.push(this.execs);}
+    }
+    return this.crash;
+  }
+}
+
 // app.js
 
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',book:'M3 4h7l2 2 2-2h7v15h-7l-2 2-2-2H3z M12 6v15',chart:'M4 20V10 M10 20V4 M16 20v-7 M22 20H2',code:'m8 5-6 7 6 7 M16 5l6 7-6 7 M14 3l-4 18',arrow:'M4 12h15 M14 6l6 6-6 6',external:'M14 3h7v7 M21 3l-9 9 M10 4H4v16h16v-6',sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M5 19l1-1 M18 6l1-1',menu:'M3 6h18 M3 12h18 M3 18h18',close:'m5 5 14 14 M19 5 5 19',play:'m8 4 12 8-12 8z',step:'m5 5 10 7-10 7z M19 5v14',back:'M8 4v16 M19 5 9 12l10 7z',build:'m14 3 7 7-4 4-7-7z M12 12 3 21 M3 17l4 4',check:'m4 12 5 5L20 6',reset:'M4 10a8 8 0 1 1 1 8 M4 3v7h7',over:'M4 16c0-5 4-8 8-8s8 3 8 8 M17 11l4 1-1 4',finish:'M12 20V6 M6 12l6-6 6 6 M4 4h16',download:'M12 3v12 M7 10l5 5 5-5 M4 17v4h16v-4',github:'M9 19c-5 1-5-2-7-2 M16 22v-4a4 4 0 0 0-1-3c4 0 6-2 6-6a5 5 0 0 0-1-3 5 5 0 0 0 0-4s-2 0-4 2a13 13 0 0 0-7 0C7 2 5 2 5 2a5 5 0 0 0 0 4 5 5 0 0 0-1 3c0 4 2 6 6 6a4 4 0 0 0-1 3v4',chip:'M6 6h12v12H6z M9 9h6v6H9z M9 2v4 M15 2v4 M9 18v4 M15 18v4 M2 9h4 M2 15h4 M18 9h4 M18 15h4',left:'M20 12H4 M10 6l-6 6 6 6',pause:'M8 4v16 M16 4v16',save:'M5 3h12l4 4v14H3V3z M7 3v6h10V3 M7 21v-8h10v8'};
+const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',book:'M3 4h7l2 2 2-2h7v15h-7l-2 2-2-2H3z M12 6v15',chart:'M4 20V10 M10 20V4 M16 20v-7 M22 20H2',code:'m8 5-6 7 6 7 M16 5l6 7-6 7 M14 3l-4 18',arrow:'M4 12h15 M14 6l6 6-6 6',external:'M14 3h7v7 M21 3l-9 9 M10 4H4v16h16v-6',sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M5 19l1-1 M18 6l1-1',menu:'M3 6h18 M3 12h18 M3 18h18',close:'m5 5 14 14 M19 5 5 19',play:'m8 4 12 8-12 8z',step:'m5 5 10 7-10 7z M19 5v14',back:'M8 4v16 M19 5 9 12l10 7z',build:'m14 3 7 7-4 4-7-7z M12 12 3 21 M3 17l4 4',check:'m4 12 5 5L20 6',reset:'M4 10a8 8 0 1 1 1 8 M4 3v7h7',over:'M4 16c0-5 4-8 8-8s8 3 8 8 M17 11l4 1-1 4',finish:'M12 20V6 M6 12l6-6 6 6 M4 4h16',download:'M12 3v12 M7 10l5 5 5-5 M4 17v4h16v-4',github:'M9 19c-5 1-5-2-7-2 M16 22v-4a4 4 0 0 0-1-3c4 0 6-2 6-6a5 5 0 0 0-1-3 5 5 0 0 0 0-4s-2 0-4 2a13 13 0 0 0-7 0C7 2 5 2 5 2a5 5 0 0 0 0 4 5 5 0 0 0-1 3c0 4 2 6 6 6a4 4 0 0 0-1 3v4',chip:'M6 6h12v12H6z M9 9h6v6H9z M9 2v4 M15 2v4 M9 18v4 M15 18v4 M2 9h4 M2 15h4 M18 9h4 M18 15h4',left:'M20 12H4 M10 6l-6 6 6 6',pause:'M8 4v16 M16 4v16',save:'M5 3h12l4 4v14H3V3z M7 3v6h10V3 M7 21v-8h10v8',target:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10 M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2'};
 const icon=n=>`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[n]||icons.code}"/></svg>`;
 const KEY='teard0wn-lab:v1';
 let storageOK=true,state={version:1,theme:'dark',progress:{},drafts:{},quizzes:{},lastLab:null};
 try{const raw=localStorage.getItem(KEY);if(raw)state=validateState(JSON.parse(raw));}catch{storageOK=false;}
 document.documentElement.dataset.theme=state.theme;
-let current=null,machine=null,breakpoints=new Set(),watchpoints=new Set(),dirty=false,running=false,runToken=0,sectionIndex=0,inspectTab='registers',memoryBase=DATA,hints=0,solutionVisible=false,results=null,mobileTab='lesson',filter='All',query='',toastTimer;
+let current=null,machine=null,breakpoints=new Set(),watchpoints=new Set(),dirty=false,running=false,runToken=0,sectionIndex=0,inspectTab='registers',memoryBase=DATA,hints=0,solutionVisible=false,results=null,mobileTab='lesson',filter='All',query='',toastTimer,fuzzer=null,fuzzRunning=false,fuzzToken=0;
 function validateState(v){
  if(!v||v.version!==1||typeof v!=='object')throw new Error('Unrecognized progress format.');
  const out={version:1,theme:v.theme==='light'?'light':'dark',progress:{},drafts:{},quizzes:{},lastLab:lessonById(v.lastLab)?v.lastLab:null};
@@ -846,7 +1000,7 @@ function shell(active,crumb,body,lab=false){
  <button class="mobile-close iconbtn" id="close-menu" aria-label="Close navigation">${icon('close')}</button>
  <a class="brand" href="#home" aria-label="teard0wn lab home"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTIiIGZpbGw9IiNkNGY3NmIiLz48cGF0aCBkPSJNMTYgMTMgNyAyNGw5IDExTTMyIDEzbDkgMTEtOSAxMU0yNyAxMWwtNiAyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTUxYjEzIiBzdHJva2Utd2lkdGg9IjMuMyIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPgo=" alt=""><div><div class="brand-name">teard0wn<span> lab</span></div><div class="brand-sub">SYSTEMS · SECURITY · RESEARCH</div></div></a>
  <div><div class="navlabel">Workspace</div><nav class="navgroup">
- ${[['home','grid','Overview'],['curriculum','book','Curriculum'],['compiled','code','Compiled C'],['progress','chart','Your progress'],['reference','chip','Engine reference']].map(([id,ic,label])=>`<a class="navitem ${active===id?'active':''}" href="#${id}" ${active===id?'aria-current="page"':''}>${icon(ic)}${label}${id==='curriculum'?`<span class="count">${tracks.length}</span>`:id==='compiled'?`<span class="count">${compiledLessons.length}</span>`:''}</a>`).join('')}
+ ${[['home','grid','Overview'],['curriculum','book','Curriculum'],['compiled','code','Compiled C'],['fuzz','target','Fuzzing'],['progress','chart','Your progress'],['reference','chip','Engine reference']].map(([id,ic,label])=>`<a class="navitem ${active===id?'active':''}" href="#${id}" ${active===id?'aria-current="page"':''}>${icon(ic)}${label}${id==='curriculum'?`<span class="count">${tracks.length}</span>`:id==='compiled'?`<span class="count">${compiledLessons.length}</span>`:id==='fuzz'?`<span class="count">${fuzzTargets.length}</span>`:''}</a>`).join('')}
  </nav></div><div><div class="navlabel">Continue learning</div><a class="navitem" href="#lab/${nextLesson().id}">${icon('play')}<span>${esc(nextLesson().title)}</span></a></div>
  <div class="sidebar-bottom"><div class="prereq-card"><div class="eyebrow">Before you begin</div><p>Know the machine beneath the code.</p>${external(prerequisite,'Memory Systems Lab')}</div><div class="version"><span>v0.1 · foundation release</span><span>LOCAL</span></div></div></aside>
  <header class="topbar"><div class="row"><button class="mobile-menu iconbtn" id="menu" aria-label="Open navigation" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb"><span class="path-label">teard0wn lab</span><span class="path-label">/</span><span>${esc(crumb)}</span></div></div><div class="top-right"><span class="top-note">YOUR BROWSER. YOUR WORKBENCH.</span><a class="iconbtn github-link" href="https://github.com/himasudo/teard0wn-lab" target="_blank" rel="noopener noreferrer" aria-label="Project source on GitHub">${icon('github')}</a><button class="iconbtn" id="theme" aria-label="Switch to ${state.theme==='dark'?'light':'dark'} theme">${icon('sun')}</button></div></header>
@@ -989,12 +1143,41 @@ function clab(id){
  $$('[data-inspect]').forEach(b=>b.onclick=()=>{inspectTab=b.dataset.inspect;$$('[data-inspect]').forEach(x=>{x.classList.toggle('active',x.dataset.inspect===inspectTab);x.setAttribute('aria-selected',String(x.dataset.inspect===inspectTab));});renderInspect();});
  renderAll();
 }
+function fuzzIndex(){
+ shell('fuzz','Fuzzing',`<div class="page-title"><div class="eyebrow">COVERAGE-GUIDED FUZZING</div><h1>Let the search find the bug.</h1><p>A fuzzer feeds mutated inputs to a target and watches which instructions each run reaches. By keeping every input that uncovers new code, it works through gates that blind random search never could. A crash here is an engine fault — a divide by zero or an out-of-bounds access.</p></div><div class="lesson-list">${fuzzTargets.map((t,i)=>`<a class="lesson-link" href="#flab/${t.id}"><span class="num">${String(i+1).padStart(2,'0')}</span><div><strong>${esc(t.title)}</strong><span class="meta">${esc(t.subtitle)}</span></div>${icon('arrow')}</a>`).join('')}</div><div class="notice"><strong>Coverage = executed instructions.</strong> The map lights up each instruction the corpus has reached. Watch it fill as the fuzzer crosses each gate, then stop when it hits the fault.</div>`);
+}
+function flab(id){
+ const t=fuzzTargets.find(x=>x.id===id);if(!t)return notFound();
+ fuzzer=new Fuzzer(t);fuzzRunning=false;fuzzToken++;
+ const srcRows=t.source.map((s,i)=>`<div class="cline" data-line="${i+1}"><span class="cn">${String(i+1).padStart(2,'0')}</span><code>${esc(s)||' '}</code></div>`).join('');
+ shell('fuzz',`${t.title} / Fuzzer`,`<a class="textlink" href="#fuzz">${icon('left')}Fuzzing targets</a>
+ <div class="lab-title"><div><div class="eyebrow">FUZZ TARGET · ${esc(t.inputLabel)}</div><h1>${esc(t.title)}</h1><p>${esc(t.subtitle)}</p></div></div>
+ <div class="notice">${esc(t.intro)}</div>
+ <div class="clab-layout"><section class="csource"><header class="editor-header"><span class="file-tab">${icon('code')}${esc(t.entry)}.c</span><span class="top-note">read-only target</span></header><div class="cbody">${srcRows}</div></section>
+ <section class="workbench"><div class="toolbar"><button class="btn primary" id="fz-run">${icon('play')}Start</button><button class="btn" id="fz-reset">${icon('reset')}Reset</button></div>
+ <div class="status-line" id="fz-status" role="status" aria-live="polite"></div>
+ <div class="micro-grid" id="fz-stats"></div>
+ <div class="disassembly"><div class="box-head"><span>COVERAGE MAP</span><span>covered instructions light up</span></div><div class="dis-scroll"><table class="dis-table"><tbody id="fz-rows"></tbody></table></div></div>
+ <p class="inspector-help">The corpus keeps one input per newly-covered instruction; mutation explores from there. Execution is bounded; a crash is an engine fault.</p></section></div>`);
+ const render=()=>{
+  $('#fz-rows').innerHTML=t.insns.map(i=>`<tr class="${fuzzer.global.has(i.addr)?'covered':''}"><td class="address">${hex(i.addr,4)}</td><td class="bytes">${esc(i.bytes)}</td><td class="insn">${esc(i.text)}</td></tr>`).join('');
+  const covered=t.insns.filter(i=>fuzzer.global.has(i.addr)).length,pct=Math.round(covered/t.insns.length*100);
+  $('#fz-stats').innerHTML=`<div><span>Executions</span><b>${fuzzer.execs.toLocaleString()}</b></div><div><span>Corpus</span><b>${fuzzer.corpus.length}</b></div><div><span>Coverage</span><b>${covered}/${t.insns.length} · ${pct}%</b></div><div><span>Last input</span><b>0x${(fuzzer.lastInput>>>0).toString(16).padStart(8,'0')}</b></div>`;
+  const st=$('#fz-status');
+  if(fuzzer.crash){st.className='status-line error';st.innerHTML=`<span class="status-dot"></span><span>CRASH — ${esc(fuzzer.crash.reason)} on input 0x${(fuzzer.crash.input>>>0).toString(16).padStart(8,'0')} after ${fuzzer.execs.toLocaleString()} executions</span>`;}
+  else{st.className='status-line'+(fuzzRunning?'':'');st.innerHTML=`<span class="status-dot"></span><span>${fuzzRunning?'fuzzing…':'Ready. Start to search for a crashing input.'}</span>`;}
+ };
+ const pump=()=>{const myToken=fuzzToken;const loop=()=>{if(!fuzzRunning||myToken!==fuzzToken)return;fuzzer.step(2000);render();if(fuzzer.crash){fuzzRunning=false;$('#fz-run').innerHTML=icon('play')+'Start';render();return;}setTimeout(loop,0);};setTimeout(loop,0);};
+ $('#fz-run').onclick=()=>{if(fuzzer.crash)return;fuzzRunning=!fuzzRunning;$('#fz-run').innerHTML=icon(fuzzRunning?'pause':'play')+(fuzzRunning?'Pause':'Start');if(fuzzRunning)pump();};
+ $('#fz-reset').onclick=()=>{fuzzRunning=false;fuzzToken++;fuzzer=new Fuzzer(t);$('#fz-run').innerHTML=icon('play')+'Start';render();};
+ render();
+}
 function progress(){shell('progress','Your progress',`<div class="page-title"><div class="eyebrow">YOUR INVESTIGATIONS</div><h1>Understanding, accumulated.</h1><p>${completed()} of ${lessons.length} runnable exercises verified. Completion records the exercise checks; it is not a certification of mastery.</p><div class="row wrap"><button class="btn primary" id="export-progress">${icon('download')}Export progress & code</button><button class="btn" id="import-progress">${icon('save')}Import progress</button><input type="file" id="progress-file" accept="application/json,.json" hidden></div></div><div class="progress-grid">${tracks.filter(t=>t.labs.length).map(t=>{const n=t.labs.filter(done).length;return `<a class="progress-item" href="#track/${t.id}"><h3>${t.title}</h3><progress max="${t.labs.length}" value="${n}" aria-label="${esc(t.title)} progress"></progress><div class="row spread"><span>${n} / ${t.labs.length} complete</span>${icon('arrow')}</div></a>`;}).join('')}</div><div class="section-head"><h2>Exercise ledger</h2></div><div class="lesson-list">${lessons.map((l,i)=>lessonLink(l,i)).join('')}</div><div class="notice"><strong>Portable by design.</strong> Export includes your source edits, inputs, quiz answers, and completion records. Import replaces this browser’s teard0wn data after confirmation. It never executes imported source automatically.</div>`);
  $('#export-progress').onclick=()=>download('teard0wn-progress.json',JSON.stringify(state,null,2),'application/json');$('#import-progress').onclick=()=>$('#progress-file').click();$('#progress-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>2_000_000)throw new Error('Progress file is too large (2 MB maximum).');const incoming=validateState(JSON.parse(await f.text()));if(!confirm('Replace this browser’s teard0wn progress and saved code with this file?'))return;state=incoming;save();document.documentElement.dataset.theme=state.theme;progress();toast('Progress imported. Source is loaded only when you open a lab.');}catch(e){toast(`Import failed: ${e.message}`);}};
 }
 function reference(){shell('reference','Engine reference',`<div class="page-title"><div class="eyebrow">KNOW YOUR INSTRUMENT</div><h1>What this machine does.</h1><p>Real x86-64 instruction encodings, executed by an explicitly bounded teaching engine. Understand the model before drawing conclusions from it.</p></div><article class="prose"><h2>Execution model</h2><p>The assembler emits machine-code bytes, resolves labels, and maps instructions to source lines. The executor decodes bytes at RIP; it does not merely animate source text. Registers use BigInt for exact 64-bit integers. Execution is single-threaded, deterministic, and limited by an instruction budget.</p><p>This is not a complete x86 CPU, Linux VM, C/C++ compiler, or native debugger. It models the subset below, a small address map, and two successful syscall cases. It does not measure your processor, implement timing, or run operating-system/kernel experiments.</p><h2>Supported instruction families</h2><table><thead><tr><th>Family</th><th>Instructions</th><th>Boundaries</th></tr></thead><tbody><tr><td>Data</td><td>MOV, LEA</td><td>Register/immediate and register/memory forms. No memory-to-memory MOV.</td></tr><tr><td>Arithmetic</td><td>ADD, SUB, CMP, INC, DEC, NEG, IMUL</td><td>IMUL is the two-operand 16/32/64-bit form. No division or carry-chain instructions.</td></tr><tr><td>Logic</td><td>AND, OR, XOR, TEST, NOT</td><td>8/16/32/64-bit widths.</td></tr><tr><td>Shifts</td><td>SHL, SHR, SAR</td><td>Immediate counts. Undefined flags display ?.</td></tr><tr><td>Control</td><td>JMP, Jcc, CALL, RET, NOP, INT3</td><td>Direct near label branches. No indirect branches or privileged instructions.</td></tr><tr><td>Stack</td><td>PUSH, POP</td><td>64-bit registers; PUSH also accepts a signed 32-bit immediate.</td></tr><tr><td>Boundary</td><td>SYSCALL</td><td>Modeled Linux x86-64 write(1) to stdout/stderr and exit(60), only.</td></tr></tbody></table><h2>Registers, flags, and addresses</h2><ul><li>RAX–R15 and their 32/16/low-8-bit views. Writes to a 32-bit register zero the upper half. AH/BH/CH/DH are not supported.</li><li>CF, PF, AF, ZF, SF, OF. Undefined flags are represented explicitly; using an undefined condition causes a teaching-engine fault.</li><li>Memory expressions: base + index × 1/2/4/8 + signed 32-bit displacement. Address registers are 64-bit. No RIP-relative, segment, or address-size-override forms.</li><li>Mapped code is read-only/executable. Data and stack are writable/non-executable. These are fixture permissions, not a full page-table implementation.</li></ul><table><thead><tr><th>Region</th><th>Addresses</th><th>Behavior</th></tr></thead><tbody><tr><td>Code</td><td>0x1000 to the assembled code end (below 0x2000)</td><td>RX, at most 4 KiB</td></tr><tr><td>Data</td><td>0x2000–0x3fff</td><td>RW, zero-initialized outside declared data</td></tr><tr><td>Stack</td><td>0x7000–0x7fff</td><td>RW; initial RSP 0x7ff8</td></tr><tr><td>Harness return</td><td>0xfff0</td><td>Synthetic sentinel; RET to it ends the function</td></tr></tbody></table><h2>Debugger behavior</h2><p>Step executes exactly one machine instruction. Over runs a called function to completion and stops at the instruction after the call; Finish runs to the current function’s return. Breakpoints and watchpoints still stop execution inside a stepped-over or finished region. Address breakpoints stop before an instruction. Write watchpoints stop after an instruction touches the selected byte. Back restores registers, flags, memory writes, output, and call-event state for the most recent 512 steps. Build resets the machine and clears breakpoints/watches. Run yields to the browser between instruction batches and stops after 10,000 instructions.</p><h2>Source and input</h2><p>Use Intel syntax with destination first. Labels and register names are case-insensitive. Semicolon and # introduce comments outside quoted literals. The .text/.data sections and .byte/.quad/.zero/.ascii/.asciz data directives are supported. Memory sizes are byte, word, dword, or qword ptr. Source is limited to 64,000 characters. Input accepts decimal/hex/binary integers fitting 64 bits.</p><h2>Honest limits</h2><p>Source-to-machine mappings describe this assembler, not compiler optimization or DWARF. The call list records CALL/RET events; it cannot reconstruct an arbitrary corrupted native call stack. Modeled WRITE completes in full and does not reproduce real short writes, signals, errno, or file descriptors. Flags and instruction behaviors are checked against native x86-64 in the repository tests, but that is evidence for the tested subset, not full CPU conformance.</p><p>There is no native C compiler in the browser release. The repository includes separate native C investigations and GNU assembly export. Future kernel, TrustZone, fuzzing, and PMU laboratories need their own validated runtime. Their syllabus is retained in the curriculum.</p><h2>References and project files</h2><p>${external(sources.intel.url,sources.intel.label)}<br>${external(sources.abi.url,sources.abi.label)}<br>${external(sources.gas.url,sources.gas.label)}</p><p><a class="textlink" href="./docs/ENGINE.md">Detailed engine contract</a> · <a class="textlink" href="./docs/CURRICULUM.md">Coverage ledger</a> · <a class="textlink" href="./README.md">Project README</a></p></article>`);}
 function notFound(){shell('home','Not found','<div class="empty"><h1>This page does not exist.</h1><p>The requested lesson or track may have moved.</p><a class="btn primary" href="#curriculum">Open curriculum</a></div>');}
-function route(){const path=location.hash.slice(1)||'home';if(path==='main')return;saveDraft();stopRun();current=null;machine=null;document.title='teard0wn lab — '+(path.startsWith('lab/')?(lessonById(path.slice(4))?.title||'Lab'):'Understand every layer');if(path==='home')home();else if(path==='curriculum')curriculum();else if(path==='compiled')compiledIndex();else if(path==='progress')progress();else if(path==='reference')reference();else if(path.startsWith('track/'))track(path.slice(6));else if(path.startsWith('lab/'))lab(path.slice(4));else if(path.startsWith('clab/'))clab(path.slice(5));else notFound();window.scrollTo(0,0);}
+function route(){const path=location.hash.slice(1)||'home';if(path==='main')return;saveDraft();stopRun();current=null;machine=null;document.title='teard0wn lab — '+(path.startsWith('lab/')?(lessonById(path.slice(4))?.title||'Lab'):'Understand every layer');fuzzRunning=false;fuzzToken++;if(path==='home')home();else if(path==='curriculum')curriculum();else if(path==='compiled')compiledIndex();else if(path==='fuzz')fuzzIndex();else if(path==='progress')progress();else if(path==='reference')reference();else if(path.startsWith('track/'))track(path.slice(6));else if(path.startsWith('lab/'))lab(path.slice(4));else if(path.startsWith('clab/'))clab(path.slice(5));else if(path.startsWith('flab/'))flab(path.slice(5));else notFound();window.scrollTo(0,0);}
 window.addEventListener('hashchange',route);window.addEventListener('beforeunload',saveDraft);window.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#sidebar')?.classList.remove('open');$('#menu')?.setAttribute('aria-expanded','false');if(running){stopRun();machine.reason='Paused by you';renderExecution();}}});
 $('.skip').onclick=e=>{e.preventDefault();const main=$('#main');main.tabIndex=-1;main.focus();main.scrollIntoView();};
 route();

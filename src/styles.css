@@ -30,3 +30,7 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .micro-grid>div{display:flex;flex-direction:column;gap:2px;padding:7px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
 .micro-grid span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .micro-grid b{font-family:var(--mono);font-size:15px;color:var(--text)}
+
+.dis-table tr.covered td{background:var(--surface3)}
+.dis-table tr.covered .insn{color:var(--accent)}
+.fz-stats{margin:10px 0}

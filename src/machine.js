@@ -269,6 +269,9 @@ export class Machine {
       name=(op===0xfe?{0:'inc',1:'dec'}:{0:'inc',1:'dec',2:'callind',4:'jmpind',6:'pushind'})[x.field];
       if(!name)fail('Unsupported FE/FF group.');args=[x.operand];
     }else if(op===0xc0||op===0xc1){const w=op===0xc0?8:wide,x=rm(w);name=({4:'shl',5:'shr',7:'sar'})[x.field];if(!name)fail('Unsupported shift.');args=[x.operand,{kind:'imm',width:8,value:imm(1)}];}
+    else if(op===0xa8||op===0xa9){const w=op===0xa8?8:wide;name='test';args=[reg(0,w),{kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)}];}
+    else if(op===0x69||op===0x6b){const x=rm(wide),immv=op===0x6b?imm(1,true):imm(Math.min(wide,32)/8,wide===64);name='imul3';args=[reg(x.field,wide),x.operand,{kind:'imm',width:wide,value:immv}];}
+    else if(Object.keys(binBase).some(k=>op===binBase[k]+4||op===binBase[k]+5)){const g=Object.keys(binBase).find(k=>op===binBase[k]+4||op===binBase[k]+5),w=op===binBase[g]+4?8:wide;name=g;args=[reg(0,w),{kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)}];}
     else{
       const group=Object.keys(binBase).find(k=>op>=binBase[k]&&op<=binBase[k]+3);
       if(!group)fail(`Unsupported opcode 0x${op.toString(16)} at 0x${Number(this.rip).toString(16)}.`);
@@ -319,6 +322,7 @@ export class Machine {
         case 'xchg':{const a=read(),b=rhs();this.write(dst,b);this.write(src,a);break;}
         case 'mul':{const a=this.getReg(0,w),b=read(),prod=a*b;if(w===8)this.setReg(0,16,prod&0xffffn);else{this.setReg(0,w,prod&mask(w));this.setReg(2,w,(prod>>BigInt(w))&mask(w));}this.flags.CF=this.flags.OF=(prod>>BigInt(w))!==0n;for(const f of['SF','ZF','AF','PF'])this.flags[f]=null;break;}
         case 'imul1':{const prod=signed(this.getReg(0,w),w)*signed(read(),w),lo=unsigned(prod,w);if(w===8)this.setReg(0,16,unsigned(prod,16));else{this.setReg(0,w,lo);this.setReg(2,w,unsigned(prod>>BigInt(w),w));}this.flags.CF=this.flags.OF=signed(lo,w)!==prod;for(const f of['SF','ZF','AF','PF'])this.flags[f]=null;break;}
+        case 'imul3':{const r=signed(rhs(),w)*signed(d.args[2].value,w);this.write(dst,r);this.flags.CF=this.flags.OF=signed(r,w)!==r;for(const f of['SF','ZF','AF','PF'])this.flags[f]=null;break;}
         case 'div':{const b=read();if(b===0n)fail('Integer divide by zero.');const dividend=w===8?this.getReg(0,16):(this.getReg(2,w)<<BigInt(w))|this.getReg(0,w),q=dividend/b,r=dividend%b;if(q>mask(w))fail('Divide overflow (quotient too large).');if(w===8)this.setReg(0,16,(r<<8n)|q);else{this.setReg(0,w,q);this.setReg(2,w,r);}for(const f of['CF','OF','SF','ZF','AF','PF'])this.flags[f]=null;break;}
         case 'idiv':{const b=signed(read(),w);if(b===0n)fail('Integer divide by zero.');const dividend=w===8?signed(this.getReg(0,16),16):signed((this.getReg(2,w)<<BigInt(w))|this.getReg(0,w),w*2),q=dividend/b,r=dividend%b;if(q<-(1n<<BigInt(w-1))||q>(1n<<BigInt(w-1))-1n)fail('Divide overflow (signed quotient out of range).');if(w===8)this.setReg(0,16,(unsigned(r,8)<<8n)|unsigned(q,8));else{this.setReg(0,w,unsigned(q,w));this.setReg(2,w,unsigned(r,w));}for(const f of['CF','OF','SF','ZF','AF','PF'])this.flags[f]=null;break;}
         case 'callind':{const target=read();this.regs[4]=unsigned(this.regs[4]-8n);this.writeMem(this.regs[4],64,d.next);this.calls.push({target,returnTo:d.next,sp:this.regs[4]});this.rip=target;break;}

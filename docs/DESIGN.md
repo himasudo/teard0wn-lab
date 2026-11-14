@@ -87,11 +87,15 @@ real CPU at three layers:
 - **Microarchitecture overlay.** `src/micro.js` models the Memory Systems Lab
   machine's data caches, TLBs, and a bimodal predictor; the Micro tab shows
   per-instruction hit level, TLB outcome, prediction, and modeled cycles.
+- **Coverage-guided fuzzing.** `src/fuzzer.js` mutates inputs to a compiled
+  target, keeps any input that covers a new instruction, and reports an engine
+  fault as a crash. The Fuzzing section shows a live coverage map; the gated
+  target is cracked in the low thousands of executions where blind search could
+  not. Targets build through the same pipeline (`lessons/fuzz/`).
 
 ## Roadmap
 
-1. **More tracks.** Two-core + store-buffer mode for TSO/coherence litmus tests;
-   a coverage-guided fuzzing harness over the engine; an ELF/linking/PLT-GOT
-   walkthrough.
-2. **Writable data / broader compiled support.** Load `.data`/`.bss` so mutable
+1. **Concurrency.** Two-core + store-buffer mode for TSO/coherence litmus tests.
+2. **Toolchain track.** An ELF/linking/PLT-GOT walkthrough.
+3. **Writable data / broader compiled support.** Load `.data`/`.bss` so mutable
    globals run; decode SSE for vectorized `-O2` output.

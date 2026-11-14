@@ -1,0 +1,28 @@
+[
+  {
+    "id": "f-crackme",
+    "file": "crackme.c",
+    "entry": "crackme",
+    "title": "Byte-gated crackme",
+    "subtitle": "Four 1-in-256 gates, then a crash. Coverage guidance cracks it a byte at a time.",
+    "track": "fuzzing",
+    "inputLabel": "x (EDI)",
+    "input": { "rdi": 0 },
+    "expect": "00000000",
+    "retBits": 32,
+    "intro": "Each gate compares one byte of the input. A blind fuzzer would need 2^32 tries; a coverage-guided fuzzer keeps every input that reaches a new gate and mutates from there, so it falls through in the low thousands. The last gate divides by zero -- the fault the fuzzer is hunting."
+  },
+  {
+    "id": "f-modhash",
+    "file": "modhash.c",
+    "entry": "modhash",
+    "title": "Shallow divide-by-zero",
+    "subtitle": "One scramble, one bad divisor. Found fast, with or without coverage.",
+    "track": "fuzzing",
+    "inputLabel": "x (EDI)",
+    "input": { "rdi": 0 },
+    "expect": "ffffffee",
+    "retBits": 32,
+    "intro": "No gates here: roughly one input in 256 scrambles to the divisor value that divides by zero. Fuzzing finds it quickly, which is the point of the contrast -- depth, not just the presence of a bug, is what makes coverage guidance matter."
+  }
+]

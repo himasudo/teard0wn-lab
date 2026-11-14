@@ -38,6 +38,10 @@ static const int T8[8]={2,3,5,7,11,13,17,19};
 int table_lookup(int i){ if((unsigned)i>=8) return -1; return T8[i]; }
 int sw8(int x){ switch(x){case 0:return 100;case 1:return 111;case 2:return 122;case 3:return 133;case 4:return 144;case 5:return 155;case 6:return 166;case 7:return 177;default:return -1;} }
 int pick(int i){ static const char s[]="teardown"; return (i>=0&&i<8)?(unsigned char)s[i]:0; }
+int mulc(int x){ return x * 1000003; }            /* imul r32,r/m32,imm32 (0x69) */
+int subc(int x){ return x - 0x7eadbeef; }         /* accumulator sub eax,imm32 (0x2d) */
+unsigned andc(unsigned x){ return x & 0xcafef00du; } /* accumulator and eax,imm32 (0x25) */
+int xorc(int x){ return x ^ 0x12345678; }         /* accumulator xor eax,imm32 (0x35) */
 `;
 const DRIVER = `
 #include <stdio.h>
@@ -68,6 +72,10 @@ int main(int c,char**v){
   else if(!strcmp(f,"table_lookup")) printf("%08x\\n",(uint32_t)table_lookup(A));
   else if(!strcmp(f,"sw8")) printf("%08x\\n",(uint32_t)sw8(A));
   else if(!strcmp(f,"pick")) printf("%08x\\n",(uint32_t)pick(A));
+  else if(!strcmp(f,"mulc")) printf("%08x\\n",(uint32_t)mulc(A));
+  else if(!strcmp(f,"subc")) printf("%08x\\n",(uint32_t)subc(A));
+  else if(!strcmp(f,"andc")) printf("%08x\\n",(uint32_t)andc((unsigned)A));
+  else if(!strcmp(f,"xorc")) printf("%08x\\n",(uint32_t)xorc(A));
   else return 2;
   return 0;
 }
@@ -94,6 +102,10 @@ const PLAN = {
   table_lookup:{ret:32,cases:[0,1,2,7,8,-1].map(x=>[x])},
   sw8:{ret:32,cases:[0,1,4,7,8,-1].map(x=>[x])},
   pick:{ret:32,cases:[0,1,7,8,-1].map(x=>[x])},
+  mulc:{ret:32,cases:[0,1,-1,1000,-1000,2147483647].map(x=>[x])},
+  subc:{ret:32,cases:[0,1,-1,2147483647,-2147483648].map(x=>[x])},
+  andc:{ret:32,cases:[0,4294967295,0xcafef00d,0x0f0f0f0f].map(x=>[x])},
+  xorc:{ret:32,cases:[0,4294967295,0x12345678,0xdeadbeef].map(x=>[x])},
 };
 const ARG=['rdi','rsi','rdx','rcx'];
 
