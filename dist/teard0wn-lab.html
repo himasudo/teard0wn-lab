@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101414">
+  <meta name="description" content="Take systems apart. An original systems and security laboratory with lessons, editable assembly, and an inspectable x86-64 teaching engine.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-QzRTRH1cbzfEnIubFCK7w/bEQWjMhLh1dq+bCmiCl1w='; style-src 'sha256-luzVWdZHapXA9KWUvDrRGwRb5TGVHZLE8DCNpJcfST0='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>teard0wn lab — Understand every layer</title>
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTIiIGZpbGw9IiNkNGY3NmIiLz48cGF0aCBkPSJNMTYgMTMgNyAyNGw5IDExTTMyIDEzbDkgMTEtOSAxMU0yNyAxMWwtNiAyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTUxYjEzIiBzdHJva2Utd2lkdGg9IjMuMyIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPgo=" type="image/svg+xml">
+  <style>@font-face{font-family:LabSans;src:local('Inter'),local('Arial');font-display:swap}
+:root{--bg:#101414;--sidebar:#0c1010;--surface:#171c1c;--surface2:#1e2524;--surface3:#252e2b;--border:#2b3430;--text:#e9eee7;--muted:#99a69b;--faint:#65756b;--accent:#d4f76b;--accentink:#202c0b;--accentdim:#2a3520;--red:#ff9d94;--redbg:#3a2424;--blue:#94c8e6;--code:#c2d7c5;--shadow:0 18px 50px #0003;--radius:13px;--mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace;color-scheme:dark}
+html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surface2:#edf0e7;--surface3:#dfe6d6;--border:#ccd5c4;--text:#1b281e;--muted:#52634f;--faint:#687b63;--accent:#365c14;--accentink:#f8ffed;--accentdim:#e0ebce;--red:#a6362b;--redbg:#ffe8e2;--blue:#245c79;--code:#284b2e;--shadow:0 18px 50px #20351010;color-scheme:light}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:LabSans,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55}button,input,textarea,select{font:inherit}button,a,input,textarea,select{-webkit-tap-highlight-color:transparent}button,a{touch-action:manipulation}button{cursor:pointer}button:disabled{opacity:.42;cursor:not-allowed}a{color:inherit;text-decoration:none}a:hover{color:var(--accent)}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:4px}button{color:var(--text)}svg.icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}h1,h2,h3,p{margin-top:0}h1,h2,h3{line-height:1.15;letter-spacing:-.025em}h1{font-size:44px;font-weight:600}h2{font-size:26px;font-weight:600}h3{font-size:18px;font-weight:600}p{color:var(--muted)}code,kbd,pre{font-family:var(--mono)}code{font-size:.89em;color:var(--code)}kbd{border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px;color:var(--muted)}.skip{position:fixed;top:-60px;left:20px;background:var(--accent);color:var(--accentink);padding:10px;z-index:99}.skip:focus{top:10px}.mono{font-family:var(--mono)}.muted{color:var(--muted)}.eyebrow{display:flex;align-items:center;gap:8px;text-transform:uppercase;font:10px var(--mono);letter-spacing:.13em;color:var(--muted)}.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}.pill{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--border);border-radius:100px;font-size:10px;padding:4px 9px;white-space:nowrap;color:var(--muted)}.pill.ready{color:var(--accent);background:var(--accentdim);border-color:transparent}.pill.done{color:var(--accent)}.pill.planned{color:var(--faint)}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);padding:9px 13px;font-size:12px;font-weight:600;min-height:38px;white-space:nowrap}.btn:hover:not(:disabled){background:var(--surface3);color:var(--text)}.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accentink)}.btn.primary:hover:not(:disabled){filter:brightness(1.08);color:var(--accentink)}.btn.ghost{background:transparent}.btn.small{padding:6px 10px;min-height:32px;font-size:11px}.iconbtn{display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:7px;width:35px;height:35px}.iconbtn:hover{background:var(--surface2)}.row{display:flex;align-items:center;gap:12px}.spread{justify-content:space-between}.wrap{flex-wrap:wrap}.textlink{color:var(--accent);display:inline-flex;align-items:center;gap:6px;font-size:12px}.textlink:hover{text-decoration:underline}.rule{border-top:1px solid var(--border);margin:24px 0}.sidebar{position:fixed;inset:0 auto 0 0;width:216px;padding:26px 17px 18px;display:flex;flex-direction:column;gap:30px;background:var(--sidebar);border-right:1px solid var(--border);z-index:30}.brand{display:flex;gap:10px;align-items:center}.brand img{width:32px;height:32px}.brand-name{font:600 17px var(--mono);letter-spacing:-1px}.brand-name span{font-weight:400;color:var(--muted)}.brand-sub{font:9px var(--mono);letter-spacing:.16em;color:var(--faint);margin-top:3px}.navlabel{font:9px var(--mono);text-transform:uppercase;letter-spacing:.16em;color:var(--faint);padding:0 12px;margin-bottom:10px}.navgroup{display:grid;gap:5px}.navitem{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:7px;font-size:12px;color:var(--muted)}.navitem.active{background:var(--surface2);color:var(--accent)}.navitem:hover{background:var(--surface)}.navitem .count{margin-left:auto;font:10px var(--mono);color:var(--faint)}.sidebar-bottom{margin-top:auto}.prereq-card{padding:13px;background:var(--surface);border:1px solid var(--border);border-radius:9px;font-size:11px}.prereq-card p{font-size:11px;margin:7px 0 10px}.version{display:flex;justify-content:space-between;margin-top:17px;font:9px var(--mono);color:var(--faint)}.topbar{height:66px;position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:0 38px;border-bottom:1px solid var(--border);background:var(--bg);z-index:20;margin-left:216px}.breadcrumb{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:10px}.breadcrumb span:last-child{color:var(--text)}.top-right{display:flex;align-items:center;gap:16px}.top-note{font:10px var(--mono);color:var(--faint)}.mobile-menu{display:none}.main{margin-left:216px;max-width:1800px;padding:40px 38px 28px;min-height:calc(100vh - 66px)}.main.lab-main{padding-top:24px}.hero{display:grid;grid-template-columns:1.05fr 1fr;gap:35px;align-items:center;min-height:330px;padding:14px 0 42px}.hero h1{font-size:clamp(35px,3.6vw,58px);line-height:1.07;letter-spacing:-.055em;margin:22px 0 17px}.hero h1 em{font-style:normal;color:var(--accent)}.hero p{max-width:430px;font-size:13px;line-height:1.75;margin-bottom:24px}.hero-actions{display:flex;align-items:center;gap:12px}.hero-visual{border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;box-shadow:var(--shadow);transform:rotate(-1deg)}.visual-bar{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border);font:9px var(--mono);color:var(--muted)}.window-dots{display:flex;gap:5px}.window-dots i{width:5px;height:5px;border-radius:50%;background:var(--faint)}.visual-code{padding:20px 23px;font:12px/2 var(--mono);color:var(--muted)}.visual-code .highlight{background:var(--accentdim);color:var(--text);margin:0 -23px;padding:0 23px;border-left:2px solid var(--accent)}.visual-code .line{color:var(--faint);display:inline-block;width:30px;font-size:10px}.visual-code b{font-weight:400;color:var(--accent)}.visual-regs{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border)}.visual-regs div{padding:13px 15px;border-right:1px solid var(--border);font:10px var(--mono)}.visual-regs div:last-child{border:0}.visual-regs span{display:block;font-size:8px;color:var(--faint);margin-bottom:6px}.visual-foot{display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding:10px 15px;font:9px var(--mono);color:var(--muted)}.visual-foot i{width:5px;height:5px;border-radius:50%;background:var(--accent)}.statrow{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-radius:10px;margin:0 0 37px;background:var(--surface)}.statrow>div{padding:16px 22px;border-right:1px solid var(--border)}.statrow>div:last-child{border:0}.statrow strong{font:500 22px var(--mono);display:block;margin-bottom:4px}.statrow span{font-size:10px;color:var(--muted)}.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;margin:32px 0 17px}.section-head h2{font-size:22px;margin:0}.section-head p{font-size:12px;margin:7px 0 0}.filters{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:20px 0}.filter{background:transparent;border:1px solid transparent;border-radius:100px;color:var(--muted);padding:6px 13px;font-size:11px}.filter.active{border-color:var(--border);background:var(--surface2);color:var(--text)}.search{background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:9px 12px;font-size:12px;width:240px;max-width:100%}.filters .search{margin-left:auto}.track-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.track-card{display:flex;flex-direction:column;min-height:214px;border:1px solid var(--border);border-radius:11px;background:var(--surface);padding:19px;transition:background .15s,border-color .15s,transform .15s}.track-card:hover{background:var(--surface2);border-color:var(--faint);transform:translateY(-2px);color:var(--text)}.track-card.featured{border-color:#6d8038;background:linear-gradient(140deg,var(--accentdim),var(--surface) 60%)}.track-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:17px}.track-no{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--bg);border-radius:8px;font:10px var(--mono);color:var(--muted)}.track-card h3{font-size:16px;margin-bottom:10px}.track-card p{font-size:11px;line-height:1.7;margin-bottom:20px;max-width:300px}.track-bottom{margin-top:auto;display:flex;align-items:center;justify-content:space-between;font:9px var(--mono);color:var(--faint)}.track-bottom .icon{width:15px}.notice{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:16px 18px;background:var(--surface);font-size:12px;color:var(--muted);line-height:1.8;margin:24px 0}.notice strong{color:var(--text)}.footer{margin-top:36px;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:15px;font:9px var(--mono);color:var(--faint)}.page-title{max-width:700px;margin:18px 0 27px}.page-title h1{font-size:38px;margin:13px 0}.page-title p{font-size:14px;line-height:1.8}.two-columns{display:grid;grid-template-columns:1.6fr 1fr;gap:24px}.panel{border:1px solid var(--border);border-radius:11px;background:var(--surface);padding:23px}.panel h3{font-size:16px;margin:0 0 17px}.lesson-list{display:grid;gap:10px}.lesson-link{display:flex;align-items:center;gap:16px;padding:18px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}.lesson-link:hover{background:var(--surface2);color:var(--text)}.lesson-link .num{font:11px var(--mono);color:var(--faint)}.lesson-link strong{font-size:13px;display:block;margin-bottom:4px}.lesson-link span.meta{font-size:10px;color:var(--muted)}.lesson-link>.icon{margin-left:auto}.unit-list{list-style:none;padding:0;margin:0}.unit-list li{padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);display:flex;gap:10px}.unit-list li:last-child{border:0}.unit-list .unitnum{color:var(--faint);font:10px var(--mono);padding-top:3px}.prereq-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.empty{padding:45px 22px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:10px}.empty h3{color:var(--text);font-size:16px}.empty p{font-size:12px;margin:0 auto;max-width:440px}.lab-title{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}.lab-title h1{font-size:29px;margin:9px 0 6px}.lab-title p{font-size:12px;margin:0}.lab-meta{display:flex;gap:8px;margin-top:5px;align-items:center}.lab-layout{display:grid;grid-template-columns:minmax(310px,.92fr) minmax(420px,1.25fr);align-items:start;gap:22px}.reading{border:1px solid var(--border);background:var(--surface);border-radius:11px;overflow:hidden}.reading-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding:14px 19px;font-size:11px;font-weight:600}.reading-head span{font:9px var(--mono);color:var(--faint)}.reading-body{padding:25px 23px}.lesson-section h2{font-size:22px;line-height:1.3;margin-bottom:19px}.lesson-section p{font-size:13px;line-height:1.95;margin:0 0 18px}.lesson-section strong{color:var(--text);font-weight:600}.lesson-section code{background:var(--surface2);padding:2px 4px;border-radius:4px;overflow-wrap:anywhere}.section-steps{display:flex;gap:5px;margin:0 0 24px}.section-steps button{flex:1;height:5px;padding:0;border:0;border-radius:4px;background:var(--border)}.section-steps button.active{background:var(--accent)}.reading-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-top:1px solid var(--border);gap:10px}.reading-nav span{font:10px var(--mono);color:var(--faint)}.objective{padding:17px 20px;margin-top:18px;border:1px solid var(--border);border-radius:10px;background:var(--accentdim)}.objective .eyebrow{color:var(--accent);margin-bottom:9px}.objective p{font-size:12px;line-height:1.8;margin:0;color:var(--text)}.hintbox{border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:16px}.hintbox h3{font-size:13px;margin:0 0 12px}.hintbox ol{margin:15px 0;padding-left:20px;color:var(--muted);font-size:12px;line-height:1.8}.hintbox li{margin-bottom:8px}.quiz{margin-top:18px;border:1px solid var(--border);border-radius:10px;padding:20px}.quiz h3{font-size:13px;margin:0 0 13px}.quiz p{font-size:12px;color:var(--text)}.quiz-option{display:block;text-align:left;padding:10px 12px;width:100%;margin:7px 0;border:1px solid var(--border);border-radius:7px;background:var(--surface);font-size:11px;line-height:1.6}.quiz-option.correct{border-color:var(--accent);background:var(--accentdim)}.quiz-option.wrong{border-color:var(--red);background:var(--redbg)}.quiz-feedback{font-size:11px!important;line-height:1.8;margin-top:14px!important;color:var(--muted)!important}.references{font-size:10px;color:var(--faint);margin:22px 0;line-height:2}.references a{display:block;color:var(--muted);text-decoration:underline;text-underline-offset:3px}.workbench{min-width:0}.workbench-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.workbench-top .eyebrow{font-size:9px}.engine-tag{font:9px var(--mono);color:var(--faint)}.codebox{border:1px solid var(--border);border-radius:10px;background:var(--sidebar);overflow:hidden}.editor-header{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;border-bottom:1px solid var(--border)}.file-tab{font:11px var(--mono);color:var(--code);display:flex;gap:8px;align-items:center}.file-tab .icon{width:14px}.dirty{width:5px;height:5px;border-radius:50%;background:var(--accent);display:none}.dirty.show{display:block}.editor-wrap{display:flex;min-height:240px;max-height:390px;overflow:hidden}.line-numbers{padding:17px 10px 17px 14px;white-space:pre;text-align:right;line-height:1.9;font:11px/22px var(--mono);color:var(--faint);background:var(--sidebar);overflow:hidden;user-select:none;min-width:41px}.editor{border:0;resize:vertical;min-height:240px;max-height:390px;flex:1;min-width:0;background:var(--sidebar);color:var(--code);padding:17px 14px 17px 0;font:12px/22px var(--mono);tab-size:4;outline:none!important;white-space:pre;overflow:auto;border-radius:0}.editor:focus{background:var(--sidebar)}.input-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--border);padding:9px 12px;background:var(--surface)}.input-row label{font-size:10px;color:var(--muted);line-height:1.4}.input-row input{max-width:220px;width:50%;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:7px 8px;font:11px var(--mono);color:var(--text)}.toolbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:12px 0}.toolbar .btn{font-size:10px;min-height:33px;padding:7px 10px}.toolbar .btn svg{width:14px;height:14px}.toolbar .verify{margin-left:auto}.status-line{display:flex;align-items:center;gap:7px;font:10px var(--mono);min-height:32px;color:var(--muted);margin:1px 0 9px;overflow-wrap:anywhere}.status-line .status-dot{width:6px;height:6px;border-radius:50%;background:var(--faint);flex-shrink:0}.status-line.success{color:var(--accent)}.status-line.success .status-dot{background:var(--accent)}.status-line.error{color:var(--red)}.status-line.error .status-dot{background:var(--red)}.status-line .stepcount{margin-left:auto;white-space:nowrap;color:var(--faint);font-size:9px}.disassembly{border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--surface)}.box-head{padding:11px 13px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)}.box-head span:last-child{font:9px var(--mono);color:var(--faint)}.dis-scroll{max-height:232px;overflow:auto}.dis-table{width:100%;border-collapse:collapse;font:10px/1.7 var(--mono)}.dis-table tr.current{background:var(--accentdim)}.dis-table td{padding:5px 5px;vertical-align:top;white-space:nowrap}.dis-table td:first-child{width:25px;text-align:center}.dis-table .address{color:var(--faint)}.dis-table .bytes{color:var(--muted);font-size:9px;max-width:140px;white-space:normal;word-break:break-all}.dis-table .insn{color:var(--code);white-space:pre}.bp{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border:0;background:transparent;padding:0}.bp span{width:8px;height:8px;border:1px solid var(--faint);border-radius:50%}.bp.on span{background:var(--red);border-color:var(--red)}.inspector{margin-top:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface);overflow:hidden}.inspect-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 7px;overflow:auto}.inspect-tab{border:0;border-bottom:2px solid transparent;background:transparent;padding:12px 10px;font-size:10px;color:var(--faint);white-space:nowrap}.inspect-tab.active{color:var(--text);border-bottom-color:var(--accent)}.inspector-body{padding:14px;min-height:216px}.register-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 13px}.register{display:flex;justify-content:space-between;align-items:center;gap:5px;padding:5px 6px;border-radius:4px;font:10px var(--mono);color:var(--muted)}.register span:first-child{font-size:9px;color:var(--faint);text-transform:uppercase}.register.changed{background:var(--accentdim);color:var(--accent)}.register.rip{color:var(--blue)}.flagrow{display:flex;gap:7px;border-top:1px solid var(--border);margin-top:12px;padding-top:12px;flex-wrap:wrap}.flag{font:9px var(--mono);color:var(--faint);border:1px solid var(--border);border-radius:4px;padding:4px 6px}.flag.on{color:var(--accent);border-color:var(--accent);background:var(--accentdim)}.flag.undefined{color:var(--red)}.inspector-help{font-size:9px;color:var(--faint);margin:12px 0 0;line-height:1.7}.memory-controls{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}.memory-controls input{width:90px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:6px 8px;font:10px var(--mono);color:var(--text)}.memory-controls label{font-size:10px;color:var(--muted)}.memory-grid{font:10px/2 var(--mono);border-collapse:collapse;width:100%}.memory-grid th{color:var(--faint);font-size:9px;font-weight:400}.memory-grid td{padding:1px 4px;text-align:center}.memory-grid td:first-child{color:var(--faint);text-align:left}.memory-grid td.ascii{color:var(--muted);letter-spacing:2px}.memory-byte{color:var(--code)}.memory-byte.changed{background:var(--accentdim);color:var(--accent)}.memory-byte.watched{box-shadow:inset 0 -2px var(--red)}.watch-address{font:10px var(--mono);color:var(--red)}.stack-row{display:flex;justify-content:space-between;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);font:10px var(--mono)}.stack-row .addr{color:var(--faint)}.stack-row small{font-size:8px;color:var(--muted)}.output{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.8 var(--mono);color:var(--code)}.trace-row{display:grid;grid-template-columns:35px 65px 1fr;gap:10px;padding:6px 0;font:10px var(--mono);border-bottom:1px solid var(--border)}.trace-row span:first-child{color:var(--faint)}.trace-row span:nth-child(2){color:var(--blue)}.verify-results{margin-top:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:16px}.verify-results h3{font-size:12px;margin-bottom:10px}.verify-results .pass{color:var(--accent)}.verify-results .fail{color:var(--red)}.case{padding:6px 0;border-top:1px solid var(--border);font-size:10px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.case code{font-size:10px}.case .explain{color:var(--muted)}.solution{border:1px solid var(--border);background:var(--sidebar);border-radius:7px;padding:12px;overflow:auto;white-space:pre;font:11px/1.8 var(--mono);color:var(--code);margin:15px 0}.prose{max-width:900px;font-size:13px;line-height:1.85}.prose h2{font-size:23px;margin:30px 0 13px}.prose h3{font-size:17px;margin-top:23px}.prose p,.prose li{color:var(--muted)}.prose ul{padding-left:22px}.prose table{width:100%;border-collapse:collapse;display:block;overflow:auto;max-width:100%;font-size:11px}.prose td,.prose th{border:1px solid var(--border);padding:10px 13px;text-align:left}.prose th{background:var(--surface2);color:var(--text)}.progress-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.progress-item{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:17px}.progress-item h3{font-size:13px;margin:0 0 8px}.progress-item .row{font-size:10px;color:var(--muted)}progress{appearance:none;width:100%;height:4px;display:block;margin:11px 0;border:0;background:var(--border);border-radius:5px;overflow:hidden}progress::-webkit-progress-bar{background:var(--border)}progress::-webkit-progress-value{background:var(--accent)}progress::-moz-progress-bar{background:var(--accent)}.toast{position:fixed;bottom:24px;left:calc(50% + 108px);transform:translateX(-50%);z-index:80;background:var(--accent);color:var(--accentink);padding:11px 18px;border-radius:7px;box-shadow:var(--shadow);font-size:12px;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}.toast.visible{opacity:1}.mobile-lab-tabs{display:none}.storage-warning{padding:9px 14px;background:var(--redbg);color:var(--red);font-size:11px}.mobile-close{display:none}.engine-error{padding:20px;color:var(--red);font:11px/1.8 var(--mono);overflow-wrap:anywhere}.inline-status{font:10px var(--mono);color:var(--faint)}.codebox:focus-within{border-color:var(--faint)}
+@media(min-width:1600px){.lab-layout{grid-template-columns:minmax(390px,.9fr) minmax(560px,1.2fr)}.reading-body{padding:30px}.lesson-section p{font-size:14px}.register{font-size:12px}.dis-table{font-size:12px}}
+@media(max-width:1200px){.sidebar{width:190px;padding-left:13px;padding-right:13px}.brand-name{font-size:15px}.topbar,.main{margin-left:190px}.topbar{padding:0 24px}.main{padding:28px 24px}.hero{gap:24px}.track-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lab-layout{grid-template-columns:minmax(280px,.86fr) minmax(360px,1.14fr);gap:16px}.reading-body{padding:22px 18px}.toolbar{gap:5px}.toolbar .btn{padding:6px 7px}.register{font-size:9px}.register-grid{gap:3px 4px}.top-note{display:none}.toast{left:calc(50% + 95px)}}
+@media(max-width:980px){.sidebar{width:180px}.topbar,.main{margin-left:180px}.hero{grid-template-columns:1fr}.hero-visual{max-width:560px;display:none}.hero{min-height:250px;padding-top:8px}.hero p{max-width:550px}.hero h1{font-size:46px}.two-columns{grid-template-columns:1fr}.lab-layout{grid-template-columns:1fr}.mobile-lab-tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);margin:0 0 18px;padding-bottom:10px}.mobile-lab-tabs button{flex:1}.lab-layout[data-mobile=lesson] .workbench{display:none}.lab-layout[data-mobile=workbench] .lesson-column{display:none}.reading-body{padding:27px}.lesson-section p{font-size:14px}.register-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 20px}.register{font-size:12px}.editor{min-height:310px}.dis-table{font-size:11px}.statrow>div{padding:13px}.statrow strong{font-size:20px}.lab-title{align-items:flex-start}.lab-title h1{font-size:27px}.lab-meta{flex-wrap:wrap;justify-content:flex-end}.toolbar .btn{padding:8px 12px;font-size:11px}.toast{left:calc(50% + 90px)}}
+@media(max-width:700px){.sidebar{transform:translateX(-100%);width:230px;box-shadow:var(--shadow);transition:transform .18s}.sidebar.open{transform:translateX(0)}.mobile-close{display:flex;position:absolute;top:19px;right:10px;border:0}.sidebar .brand{padding-top:35px}.mobile-menu{display:flex}.topbar,.main{margin-left:0}.topbar{height:57px;padding:0 17px}.breadcrumb{font-size:10px;gap:6px}.breadcrumb .path-label{display:none}.top-right{gap:9px}.main{padding:22px 17px}.hero{padding:15px 0 26px;min-height:0}.hero h1{font-size:43px}.hero p{font-size:12px}.hero-actions{flex-wrap:wrap}.hero .eyebrow{font-size:9px}.statrow{grid-template-columns:repeat(2,1fr);margin-bottom:24px}.statrow>div{padding:13px 16px}.statrow>div:nth-child(2){border-right:0}.statrow>div:nth-child(-n+2){border-bottom:1px solid var(--border)}.track-grid{grid-template-columns:1fr}.track-card{min-height:190px;padding:18px}.track-card p{max-width:none}.section-head{align-items:center;margin-top:24px}.section-head h2{font-size:21px}.section-head p{font-size:11px}.filters{gap:3px}.filters .search{margin-left:0;width:100%;order:-1;margin-bottom:10px}.filter{font-size:10px;padding:6px 10px}.footer{flex-direction:column;gap:7px;line-height:1.7}.page-title h1{font-size:32px}.page-title p{font-size:12px}.progress-grid{grid-template-columns:1fr}.lab-title{display:block}.lab-title h1{font-size:27px}.lab-meta{justify-content:flex-start;margin-top:14px}.reading-body{padding:21px 18px}.lesson-section p{font-size:13px}.lesson-section h2{font-size:22px}.toolbar{gap:6px}.toolbar .btn{padding:7px 9px;font-size:10px}.toolbar .verify{margin-left:0}.register{font-size:10px}.register-grid{gap:4px}.inspector-body{padding:11px}.inspect-tab{font-size:9px;padding:12px 9px}.input-row input{font-size:10px}.editor{font-size:11px}.dis-table .bytes{max-width:80px;font-size:8px}.dis-table .insn{font-size:9px}.memory-grid{font-size:9px}.memory-grid td{padding:1px 2px}.memory-grid td.ascii{letter-spacing:0}.toast{left:50%}.topbar .github-link{display:none}.box-head span:last-child{font-size:8px}.workbench-top .eyebrow{font-size:8px}.engine-tag{font-size:8px}.lesson-link{padding:15px 12px;gap:12px}.reading-nav{padding:14px}.mobile-lab-tabs .btn{min-height:42px}.hintbox .row{flex-wrap:wrap}.objective p{font-size:11px}.prose td,.prose th{padding:8px}.notice{font-size:11px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+  <script type="module">// machine.js
+// teard0wn x86-64 teaching engine. Encodes and decodes real instruction bytes.
+// This deliberately bounded architecture is documented in docs/ENGINE.md.
+const REG64 = ['rax','rcx','rdx','rbx','rsp','rbp','rsi','rdi',...Array.from({length:8},(_,i)=>`r${i+8}`)];
+const NAMES = {
+  64: REG64,
+  32: ['eax','ecx','edx','ebx','esp','ebp','esi','edi',...Array.from({length:8},(_,i)=>`r${i+8}d`)],
+  16: ['ax','cx','dx','bx','sp','bp','si','di',...Array.from({length:8},(_,i)=>`r${i+8}w`)],
+  8: ['al','cl','dl','bl','spl','bpl','sil','dil',...Array.from({length:8},(_,i)=>`r${i+8}b`)]
+};
+const REGS = Object.fromEntries(Object.entries(NAMES).flatMap(([w,n])=>n.map((name,id)=>[name,{kind:'reg',id,width:+w}])));
+const CODE=0x1000, DATA=0x2000, STACK=0x7ff8, RETURN=0xfff0;
+const mask = w => (1n<<BigInt(w))-1n;
+const unsigned = (x,w=64)=>BigInt.asUintN(w,BigInt(x));
+const signed = (x,w=64)=>BigInt.asIntN(w,BigInt(x));
+const hex = (x,digits=16)=>unsigned(x,digits*4).toString(16).padStart(digits,'0');
+const le = (v,n)=>Array.from({length:n},(_,i)=>Number((BigInt(v)>>BigInt(8*i))&255n));
+const groups={add:0,or:1,and:4,sub:5,xor:6,cmp:7};
+const binBase={add:0x00,or:0x08,and:0x20,sub:0x28,xor:0x30,cmp:0x38};
+const conditions={jo:0,jno:1,jb:2,jc:2,jnae:2,jae:3,jnc:3,jnb:3,je:4,jz:4,jne:5,jnz:5,jbe:6,jna:6,ja:7,jnbe:7,js:8,jns:9,jp:10,jpe:10,jnp:11,jpo:11,jl:12,jnge:12,jge:13,jnl:13,jle:14,jng:14,jg:15,jnle:15};
+const fail = m=>{throw new Error(m);};
+const fits = (v,b)=>v>=-(1n<<BigInt(b-1)) && v<=(1n<<BigInt(b))-1n;
+
+function number(s,labels,pass=2){
+  s=s.trim();
+  if(Object.hasOwn(labels,s.toLowerCase()))return BigInt(labels[s.toLowerCase()]);
+  if(/^[-+]?(?:0x[\da-f]+|0b[01]+|\d+)$/i.test(s)){
+    if(s.startsWith('-'))return -BigInt(s.slice(1));
+    return BigInt(s.replace(/^\+/,''));
+  }
+  if(/^'.'$/.test(s))return BigInt(s.codePointAt(1));
+  if(pass===1 && /^[a-zA-Z_]\w*$/.test(s))return 0n;
+  fail(`Unknown value or label “${s}”. Use a decimal/hex integer or a defined label.`);
+}
+function operand(s,labels,pass){
+  const original=s.trim();
+  s=s.trim().toLowerCase();
+  if(REGS[s])return {...REGS[s]};
+  const m=s.match(/^(?:(byte|word|dword|qword)\s+(?:ptr\s+)?)?\[([^\]]+)\]$/);
+  if(m){
+    const terms=m[2].replace(/\s/g,'').replace(/-/g,'+-').split('+').filter(Boolean);
+    const out={kind:'mem',width:({byte:8,word:16,dword:32,qword:64})[m[1]],base:null,index:null,scale:1,disp:0n};
+    for(const t of terms){
+      if(t.includes('*')){
+        const [a,b]=t.split('*');const reg=REGS[a];
+        if(!reg || reg.width!==64 || reg.id===4 || ![1,2,4,8].includes(+b)||out.index!==null)fail('Index must be a 64-bit register other than rsp, scaled by 1, 2, 4, or 8.');
+        out.index=reg.id;out.scale=+b;
+      }else if(REGS[t]){
+        const r=REGS[t];if(r.width!==64)fail('Address registers must be 64-bit in this engine.');
+        if(out.base===null)out.base=r.id;
+        else if(out.index===null && r.id!==4)out.index=r.id;
+        else fail('Address has too many registers or uses rsp as an index.');
+      }else out.disp+=number(t,labels,pass);
+    }
+    if(out.disp<-(1n<<31n)||out.disp>=(1n<<31n))fail('Address displacement must fit a signed 32-bit value.');
+    return out;
+  }
+  return {kind:'imm',value:number(original,labels,pass)};
+}
+function prefix(width,R=0,X=0,B=0,force=false){
+  const rex=0x40|(width===64?8:0)|(R?4:0)|(X?2:0)|(B?1:0);
+  return [...(width===16?[0x66]:[]),...(rex!==0x40||force?[rex]:[])];
+}
+function modrm(opcode,width,field,rm,group=false){
+  const R=group?0:field>>3, low=field&7;
+  if(rm.kind==='reg')return [...prefix(width,R,0,rm.id>>3,width===8 && (rm.id>=4||(!group&&field>=4))),...opcode,0xc0|(low<<3)|(rm.id&7)];
+  if(rm.kind!=='mem')fail('Expected a register or a memory operand.');
+  const X=(rm.index??0)>>3, B=(rm.base??0)>>3;
+  const sib=rm.index!==null||rm.base===null||((rm.base&7)===4);
+  const mode=rm.base===null?0:2;
+  const out=[...prefix(width,R,X,B,width===8&&!group&&field>=4),...opcode,(mode<<6)|(low<<3)|(sib?4:rm.base&7)];
+  if(sib)out.push(([1,2,4,8].indexOf(rm.scale)<<6)|((rm.index===null?4:rm.index&7)<<3)|(rm.base===null?5:rm.base&7));
+  out.push(...le(rm.disp,4));
+  return out;
+}
+function widthOf(a,b){
+  const w=a.width||b?.width;if(!w)fail('Specify a memory size: byte, word, dword, or qword ptr.');
+  if(a.width && b?.width && a.width!==b.width)fail('Operand sizes do not match.');
+  return w;
+}
+function encode(op,parts,labels,addr,pass){
+  const a=parts.map(s=>operand(s,labels,pass));
+  const count=n=>{if(a.length!==n)fail(`${op} expects ${n} operand${n===1?'':'s'}.`);};
+  if(['ret','nop','int3','syscall'].includes(op)){count(0);return {ret:[0xc3],nop:[0x90],int3:[0xcc],syscall:[0x0f,0x05]}[op];}
+  if(op==='jmp'||op==='call'||Object.hasOwn(conditions,op)){
+    count(1);if(a[0].kind!=='imm')fail('Only direct label/relative branches are supported.');
+    const pre=op==='jmp'?[0xe9]:op==='call'?[0xe8]:[0x0f,0x80+conditions[op]];
+    const d=a[0].value-BigInt(addr+pre.length+4);
+    if(pass===2&&(d<-(1n<<31n)||d>=(1n<<31n)))fail('Branch target is out of range.');
+    return [...pre,...le(d,4)];
+  }
+  if(op==='push'||op==='pop'){
+    count(1);if(a[0].kind==='reg'&&a[0].width===64)return [...prefix(32,0,0,a[0].id>>3), (op==='push'?0x50:0x58)+(a[0].id&7)];
+    if(op==='push'&&a[0].kind==='imm'&&a[0].value>=-(1n<<31n)&&a[0].value<(1n<<31n))return [0x68,...le(a[0].value,4)];
+    fail(`${op} supports 64-bit registers${op==='push'?' or signed 32-bit immediates':''}.`);
+  }
+  if(['inc','dec','not','neg'].includes(op)){
+    count(1);const w=widthOf(a[0]);
+    return modrm([(['inc','dec'].includes(op)?0xfe:0xf6)+(w===8?0:1)],w,({inc:0,dec:1,not:2,neg:3})[op],a[0],true);
+  }
+  if(['shl','shr','sar'].includes(op)){
+    count(2);const w=widthOf(a[0]);if(a[1].kind!=='imm'||a[1].value<0n||a[1].value>255n)fail('Shift count must be an immediate byte.');
+    return [...modrm([w===8?0xc0:0xc1],w,({shl:4,shr:5,sar:7})[op],a[0],true),Number(a[1].value)];
+  }
+  if(op==='lea'){
+    count(2);if(a[0].kind!=='reg'||a[0].width===8||a[1].kind!=='mem')fail('lea needs a 16/32/64-bit destination register and a memory-address expression.');
+    return modrm([0x8d],a[0].width,a[0].id,a[1]);
+  }
+  if(op==='imul'){
+    count(2);const w=widthOf(a[0],a[1]);if(a[0].kind!=='reg'||w===8||a[1].kind==='imm')fail('imul supports two 16/32/64-bit register/memory operands.');
+    return modrm([0x0f,0xaf],w,a[0].id,a[1]);
+  }
+  if(op==='mov'){
+    count(2);const [d,s]=a,w=widthOf(d,s);
+    if(d.kind==='reg'&&s.kind==='imm'){
+      if(!fits(s.value,w))fail(`Immediate does not fit ${w} bits.`);
+      return [...prefix(w,0,0,d.id>>3,w===8&&d.id>=4),(w===8?0xb0:0xb8)+(d.id&7),...le(s.value,w/8)];
+    }
+    if(d.kind==='mem'&&s.kind==='imm'){
+      if(w===64?(s.value<-(1n<<31n)||s.value>=(1n<<31n)):!fits(s.value,w))fail('Memory immediate is too large; load it into a register first.');
+      return [...modrm([w===8?0xc6:0xc7],w,0,d,true),...le(s.value,Math.min(w,32)/8)];
+    }
+    if(d.kind==='reg'&&s.kind==='mem')return modrm([w===8?0x8a:0x8b],w,d.id,s);
+    if(s.kind==='reg'&&['mem','reg'].includes(d.kind))return modrm([w===8?0x88:0x89],w,s.id,d);
+    fail('mov cannot copy memory to memory.');
+  }
+  if(Object.hasOwn(groups,op)||op==='test'){
+    count(2);const [d,s]=a,w=widthOf(d,s);
+    if(s.kind==='imm'){
+      if(w===64?(s.value<-(1n<<31n)||s.value>=(1n<<31n)):!fits(s.value,w))fail('Arithmetic immediate does not fit its encoded operand.');
+      return [...modrm([op==='test'?(w===8?0xf6:0xf7):(w===8?0x80:0x81)],w,op==='test'?0:groups[op],d,true),...le(s.value,Math.min(w,32)/8)];
+    }
+    if(op==='test'){
+      if(s.kind!=='reg')fail('test requires a register or immediate second operand.');
+      return modrm([w===8?0x84:0x85],w,s.id,d);
+    }
+    if(s.kind==='reg')return modrm([binBase[op]+(w===8?0:1)],w,s.id,d);
+    if(d.kind==='reg'&&s.kind==='mem')return modrm([binBase[op]+(w===8?2:3)],w,d.id,s);
+    fail('Arithmetic cannot operate on two memory operands.');
+  }
+  fail(`Unsupported instruction “${op}”. Open Engine reference for the supported subset.`);
+}
+function stripComment(s){
+  let quote=null,escape=false;
+  for(let i=0;i<s.length;i++){
+    const c=s[i];if(escape){escape=false;continue;}if(c==='\\'){escape=true;continue;}
+    if(quote){if(c===quote)quote=null;}else if(c==='"'||c==="'")quote=c;else if(c===';'||c==='#')return s.slice(0,i);
+  }return s;
+}
+function assemble(source){
+  if(typeof source!=='string'||source.length>64000)fail('Source is limited to 64,000 characters.');
+  const lines=source.split('\n');let labels={};let instructions=[],data=[],code=[];
+  for(let pass=1;pass<=2;pass++){
+    let section='text',pc=CODE,dp=DATA;instructions=[];data=[];code=[];
+    for(let line=0;line<lines.length;line++){
+      let s=stripComment(lines[line]).trim();if(!s)continue;
+      try{
+        const m=s.match(/^([a-zA-Z_]\w*):/);if(m){const name=m[1].toLowerCase();if(pass===1){if(Object.hasOwn(labels,name))fail(`Duplicate label ${name}.`);labels[name]=section==='text'?pc:dp;}s=s.slice(m[0].length).trim();if(!s)continue;}
+        if(s==='.text'||s==='.data'){section=s.slice(1);continue;}
+        const match=s.match(/^(\S+)(?:\s+(.*))?$/),op=match[1].toLowerCase(),tail=match[2]||'';
+        let bytes;
+        if(['.byte','.quad','.zero','.ascii','.asciz'].includes(op)){
+          if(section!=='data')fail('Data directives belong after .data.');
+          if(op==='.ascii'||op==='.asciz'){
+            let value;try{value=JSON.parse(tail);}catch{fail('String must be a JSON-compatible double-quoted literal.');}
+            if(typeof value!=='string')fail('Expected a string.');
+            bytes=[...new TextEncoder().encode(value),...(op==='.asciz'?[0]:[])];
+          }else if(op==='.zero'){
+            const n=number(tail,labels,pass);if(n<0n||n>1024n)fail('.zero accepts 0–1024 bytes.');bytes=Array(Number(n)).fill(0);
+          }else{
+            bytes=tail.split(',').flatMap(v=>{const n=number(v,labels,pass),bits=op==='.byte'?8:64;if(!fits(n,bits))fail(`Data value does not fit ${bits} bits.`);return le(n,bits/8);});
+          }
+          dp+=bytes.length;data.push(...bytes);if(dp>0x4000)fail('Data exceeds the 8 KiB data region.');
+        }else{
+          if(section!=='text')fail('Instructions belong in .text.');
+          bytes=encode(op,tail?tail.split(/,(?![^\[]*\])/):[],labels,pc,pass);
+          instructions.push({address:pc,line:line+1,text:s,bytes});code.push(...bytes);pc+=bytes.length;
+          if(pc>0x2000)fail('Code exceeds the 4 KiB code region.');
+        }
+      }catch(e){throw new Error(`Line ${line+1}: ${e.message}`);}
+    }
+  }
+  if(!code.length)fail('Write at least one instruction.');
+  return {source,labels,instructions,code:Uint8Array.from(code),data:Uint8Array.from(data),entry:labels.entry??CODE};
+}
+
+class Machine {
+  constructor(program,initial={}){
+    this.program=program;this.regs=Array(16).fill(0n);this.regs[4]=BigInt(STACK);
+    this.flags={CF:false,PF:false,AF:false,ZF:false,SF:false,OF:false};
+    this.memory=new Uint8Array(0x10000);this.memory.set(program.code,CODE);this.memory.set(program.data,DATA);
+    this.rip=BigInt(program.entry);this.status='ready';this.reason='Ready at entry';this.steps=0;this.history=[];this.calls=[];this.output='';this.writes=[];
+    for(const [name,value] of Object.entries(initial)){
+      const r=REGS[name];if(!r)fail(`Unknown initial register ${name}.`);this.setReg(r.id,r.width,BigInt(value));
+    }
+    this.writeMem(STACK,64,BigInt(RETURN));this.writes=[];
+  }
+  getReg(id,width=64){return unsigned(this.regs[id],width);}
+  setReg(id,width,value){value=unsigned(value,width);this.regs[id]=width>=32?value:(this.regs[id]&~mask(width))|value;}
+  range(address,n,mode='read'){
+    const a=Number(address);if(!Number.isSafeInteger(a)||a<0||a+n>0x10000)fail(`Unmapped ${mode} at 0x${BigInt(address).toString(16)}.`);
+    const code=a>=CODE&&a+n<=CODE+this.program.code.length;
+    const data=a>=DATA&&a+n<=0x4000,stack=a>=0x7000&&a+n<=0x8000;
+    if(mode==='execute'?!code:mode==='write'?!(data||stack):!(code||data||stack))fail(`${mode==='write'&&code?'Read-only code':mode==='execute'?'Non-executable or unmapped memory':'Unmapped memory'}: ${mode} at 0x${a.toString(16)}.`);
+    return a;
+  }
+  readMem(address,width){const a=this.range(address,width/8);let v=0n;for(let i=0;i<width/8;i++)v|=BigInt(this.memory[a+i])<<BigInt(i*8);return v;}
+  writeMem(address,width,value){const a=this.range(address,width/8,'write');for(let i=0;i<width/8;i++){const old=this.memory[a+i],next=Number((BigInt(value)>>BigInt(i*8))&255n);this.memory[a+i]=next;this.writes.push({address:a+i,old,value:next});}}
+  read(o){return o.kind==='reg'?this.getReg(o.id,o.width):o.kind==='mem'?this.readMem(o.address,o.width):unsigned(o.value,o.width);}
+  write(o,v){if(o.kind==='reg')this.setReg(o.id,o.width,v);else if(o.kind==='mem')this.writeMem(o.address,o.width,v);else fail('Invalid write destination.');}
+  decode(){
+    let p=Number(this.rip),rex=0,w16=false;
+    const take=()=>{this.range(p,1,'execute');return this.memory[p++];};
+    const imm=(n,sign=false)=>{let v=0n;for(let i=0;i<n;i++)v|=BigInt(take())<<BigInt(8*i);return sign?signed(v,n*8):v;};
+    let op=take();if(op===0x66){w16=true;op=take();}if(op>=0x40&&op<=0x4f){rex=op;op=take();}
+    const wide=rex&8?64:w16?16:32;
+    const reg=(id,width)=>{if(width===8&&!rex&&id>=4&&id<=7)fail('High-byte registers ah/ch/dh/bh are outside this engine subset.');return {kind:'reg',id,width};};
+    const rm=(width)=>{
+      const b=take(),mode=b>>6,field=((b>>3)&7)|((rex&4)?8:0),low=b&7;
+      if(mode===3)return {field,operand:reg(low|((rex&1)?8:0),width)};
+      let base=low|((rex&1)?8:0),index=null,scale=1,disp=0n,ripRelative=false;
+      if(low===4){const sib=take();scale=1<<(sib>>6);const ix=(sib>>3)&7;if(ix!==4||(rex&2))index=ix|((rex&2)?8:0);base=(sib&7)|((rex&1)?8:0);if(mode===0&&(sib&7)===5){base=null;disp=imm(4,true);}}
+      else if(mode===0&&low===5){base=null;disp=imm(4,true);ripRelative=true;}
+      if(mode===1)disp=imm(1,true);if(mode===2)disp=imm(4,true);
+      if(ripRelative)fail('RIP-relative encodings are not supported in this release.');
+      const address=unsigned((base===null?0n:this.regs[base])+(index===null?0n:this.regs[index]*BigInt(scale))+disp);
+      return {field,operand:{kind:'mem',width,address}};
+    };
+    let name,args=[];
+    if(op===0x90)name='nop';else if(op===0xc3)name='ret';else if(op===0xcc)name='int3';
+    else if(op===0xe8||op===0xe9){name=op===0xe8?'call':'jmp';const d=imm(4,true);args=[{kind:'imm',width:64,value:BigInt(p)+d}];}
+    else if(op>=0x50&&op<=0x5f){name=op<0x58?'push':'pop';args=[reg((op&7)|((rex&1)?8:0),64)];}
+    else if(op===0x68){name='push';args=[{kind:'imm',width:64,value:imm(4,true)}];}
+    else if(op>=0xb0&&op<=0xbf){const w=op<0xb8?8:wide;name='mov';args=[reg((op&7)|((rex&1)?8:0),w),{kind:'imm',width:w,value:imm(w/8)}];}
+    else if(op===0x0f){
+      const op2=take();
+      if(op2===0x05)name='syscall';
+      else if(op2>=0x80&&op2<=0x8f){name='jcc';const d=imm(4,true);args=[{kind:'imm',width:64,value:BigInt(p)+d},{condition:op2&15}];}
+      else if(op2===0xaf){name='imul';const x=rm(wide);args=[reg(x.field,wide),x.operand];}
+      else fail(`Unsupported 0F opcode 0x${op2.toString(16)}.`);
+    }else if([0x88,0x89,0x8a,0x8b,0x8d].includes(op)){
+      const w=[0x88,0x8a].includes(op)?8:wide,x=rm(w);name=op===0x8d?'lea':'mov';
+      args=op===0x88||op===0x89?[x.operand,reg(x.field,w)]:[reg(x.field,w),x.operand];
+    }else if(op===0xc6||op===0xc7){const w=op===0xc6?8:wide,x=rm(w);if(x.field!==0)fail('Invalid MOV encoding.');name='mov';args=[x.operand,{kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)}];}
+    else if(op===0x80||op===0x81){const w=op===0x80?8:wide,x=rm(w);name=Object.keys(groups).find(k=>groups[k]===x.field);if(!name)fail('Unsupported arithmetic group.');args=[x.operand,{kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)}];}
+    else if(op===0x84||op===0x85){const w=op===0x84?8:wide,x=rm(w);name='test';args=[x.operand,reg(x.field,w)];}
+    else if(op===0xf6||op===0xf7||op===0xfe||op===0xff){
+      const w=op===0xf6||op===0xfe?8:wide,x=rm(w);name=op>=0xfe?({0:'inc',1:'dec'})[x.field]:({0:'test',2:'not',3:'neg'})[x.field];
+      if(!name)fail('Unsupported unary group.');args=[x.operand];if(name==='test')args.push({kind:'imm',width:w,value:imm(Math.min(w,32)/8,w===64)});
+    }else if(op===0xc0||op===0xc1){const w=op===0xc0?8:wide,x=rm(w);name=({4:'shl',5:'shr',7:'sar'})[x.field];if(!name)fail('Unsupported shift.');args=[x.operand,{kind:'imm',width:8,value:imm(1)}];}
+    else{
+      const group=Object.keys(binBase).find(k=>op>=binBase[k]&&op<=binBase[k]+3);
+      if(!group)fail(`Unsupported opcode 0x${op.toString(16)} at 0x${Number(this.rip).toString(16)}.`);
+      name=group;const direction=(op-binBase[group])>>1,w=op&1?wide:8,x=rm(w);args=direction?[reg(x.field,w),x.operand]:[x.operand,reg(x.field,w)];
+    }
+    return {name,args,next:BigInt(p),address:this.rip};
+  }
+  zsp(result,width){this.flags.ZF=result===0n;this.flags.SF=!!(result&(1n<<BigInt(width-1)));let parity=0;for(let i=0;i<8;i++)parity^=Number((result>>BigInt(i))&1n);this.flags.PF=parity===0;}
+  arithmetic(op,a,b,w){
+    const sub=op==='sub'||op==='cmp',raw=sub?a-b:a+b,r=unsigned(raw,w),signBit=1n<<BigInt(w-1);
+    this.flags.CF=sub?a<b:raw>mask(w);this.flags.OF=!!((sub?(a^b)&(a^r):~(a^b)&(a^r))&signBit);
+    this.flags.AF=!!((a^b^r)&16n);this.zsp(r,w);return r;
+  }
+  condition(c){
+    const need=(...names)=>{for(const n of names)if(this.flags[n]===null)fail(`Branch uses undefined ${n}; the preceding instruction does not define this flag.`);};
+    const f=this.flags;
+    switch(c>>1){case 0:need('OF');break;case 1:need('CF');break;case 2:need('ZF');break;case 3:need('CF','ZF');break;case 4:need('SF');break;case 5:need('PF');break;case 6:need('SF','OF');break;case 7:need('ZF','SF','OF');}
+    const v=[f.OF,f.CF,f.ZF,f.CF||f.ZF,f.SF,f.PF,f.SF!==f.OF,f.ZF||(f.SF!==f.OF)][c>>1];return c&1?!v:v;
+  }
+  snapshot(){return {regs:[...this.regs],flags:{...this.flags},rip:this.rip,status:this.status,reason:this.reason,steps:this.steps,calls:this.calls.map(x=>({...x})),output:this.output};}
+  restore(s){Object.assign(this,{...s,regs:[...s.regs],flags:{...s.flags},calls:s.calls.map(x=>({...x}))});}
+  rewind(){const h=this.history.pop();if(!h)return false;for(const w of [...h.writes].reverse())this.memory[w.address]=w.old;this.restore(h.before);this.writes=[];return true;}
+  step(){
+    if(['halted','fault'].includes(this.status))return false;
+    const before=this.snapshot();this.writes=[];
+    try{
+      const d=this.decode(),[dst,src]=d.args,w=dst?.width;this.rip=d.next;this.status='paused';this.reason='Single instruction';
+      const read=()=>this.read(dst),rhs=()=>this.read(src);
+      switch(d.name){
+        case 'mov':this.write(dst,rhs());break;
+        case 'lea':if(src.kind!=='mem')fail('Invalid LEA encoding.');this.write(dst,src.address);break;
+        case 'add':case 'sub':case 'cmp':{const result=this.arithmetic(d.name,read(),rhs(),w);if(d.name!=='cmp')this.write(dst,result);break;}
+        case 'and':case 'or':case 'xor':case 'test':{const a=read(),b=rhs(),r=d.name==='or'?a|b:d.name==='xor'?a^b:a&b;this.flags.CF=false;this.flags.OF=false;this.flags.AF=null;this.zsp(r,w);if(d.name!=='test')this.write(dst,r);break;}
+        case 'inc':case 'dec':{const cf=this.flags.CF,r=this.arithmetic(d.name==='inc'?'add':'sub',read(),1n,w);this.flags.CF=cf;this.write(dst,r);break;}
+        case 'not':this.write(dst,~read());break;
+        case 'neg':this.write(dst,this.arithmetic('sub',0n,read(),w));break;
+        case 'imul':{const r=signed(read(),w)*signed(rhs(),w);this.write(dst,r);this.flags.CF=this.flags.OF=signed(r,w)!==r;for(const f of ['SF','ZF','AF','PF'])this.flags[f]=null;break;}
+        case 'shl':case 'shr':case 'sar':{
+          const n=Number(rhs())&(w===64?63:31);if(!n)break;
+          const a=read(),nn=BigInt(n),r=unsigned(d.name==='shl'?a<<nn:d.name==='shr'?a>>nn:signed(a,w)>>nn,w);
+          this.flags.CF=d.name==='sar'?!!((a>>BigInt(Math.min(n,w)-1))&1n):n>=w?null:!!(d.name==='shl'?(a>>BigInt(w-n))&1n:(a>>BigInt(n-1))&1n);
+          this.flags.OF=n===1?(d.name==='sar'?false:d.name==='shr'?!!(a&(1n<<BigInt(w-1))):!!(r&(1n<<BigInt(w-1)))!==this.flags.CF):null;
+          this.flags.AF=null;this.zsp(r,w);this.write(dst,r);break;
+        }
+        case 'push':{const value=read();this.regs[4]=unsigned(this.regs[4]-8n);this.writeMem(this.regs[4],64,value);break;}
+        case 'pop':{const v=this.readMem(this.regs[4],64);this.regs[4]=unsigned(this.regs[4]+8n);this.write(dst,v);break;}
+        case 'call':this.regs[4]=unsigned(this.regs[4]-8n);this.writeMem(this.regs[4],64,d.next);this.calls.push({target:dst.value,returnTo:d.next,sp:this.regs[4]});this.rip=dst.value;break;
+        case 'ret':{const target=this.readMem(this.regs[4],64);this.regs[4]=unsigned(this.regs[4]+8n);this.rip=target;this.calls.pop();if(target===BigInt(RETURN)){this.status='halted';this.reason='Returned to the lab harness';}break;}
+        case 'jmp':this.rip=dst.value;break;
+        case 'jcc':if(this.condition(src.condition))this.rip=dst.value;break;
+        case 'int3':this.reason='INT3 breakpoint';break;
+        case 'nop':break;
+        case 'syscall':{
+          const nr=this.regs[0];this.regs[1]=d.next;let flags=2n;for(const [f,bit] of Object.entries({CF:0,PF:2,AF:4,ZF:6,SF:7,OF:11}))if(this.flags[f])flags|=1n<<BigInt(bit);this.regs[11]=flags;
+          if(nr===60n){this.status='halted';this.reason=`Modeled exit(${Number(this.regs[7]&255n)})`;}
+          else if(nr===1n){const count=this.regs[2];if(count>4096n)fail('Modeled write is limited to 4096 bytes.');if(this.regs[7]!==1n&&this.regs[7]!==2n)fail('Modeled write supports stdout/stderr only.');const a=this.range(this.regs[6],Number(count));this.output+=new TextDecoder().decode(this.memory.slice(a,a+Number(count)));this.regs[0]=count;}
+          else fail(`System call ${nr} is not modeled. Only write(1) and exit(60) are supported; nothing runs on the host.`);
+          break;
+        }
+        default:fail('Unimplemented instruction.');
+      }
+      this.steps++;
+      this.history.push({before,writes:[...this.writes],instruction:d.name});if(this.history.length>512)this.history.shift();
+      return true;
+    }catch(e){
+      for(const x of [...this.writes].reverse())this.memory[x.address]=x.old;this.restore(before);this.writes=[];
+      this.status='fault';this.reason=e.message;this.history.push({before,writes:[],instruction:'fault'});if(this.history.length>512)this.history.shift();return false;
+    }
+  }
+  run({limit=10000,breakpoints=new Set(),watchpoints=new Set(),skipCurrent=true}={}){
+    let n=0;
+    while(n<limit&&!['halted','fault'].includes(this.status)){
+      if(breakpoints.has(Number(this.rip))&&(!skipCurrent||n>0)){this.status='paused';this.reason='Address breakpoint';break;}
+      if(!this.step())break;n++;
+      if(this.reason==='INT3 breakpoint')break;
+      if(this.writes.some(x=>watchpoints.has(x.address))){this.reason='Memory write watchpoint';break;}
+    }
+    if(n===limit&&!['halted','fault'].includes(this.status)){this.status='paused';this.reason=`Instruction budget (${limit}) reached`;}
+    return n;
+  }
+  rowAt(){return this.program.instructions.find(x=>BigInt(x.address)===this.rip);}
+}
+
+function exportGNU(source){
+  return '.intel_syntax noprefix\n.global entry\n'+source.split('\n').map(s=>stripComment(s)).join('\n')+'\n.section .note.GNU-stack,"",@progbits\n';
+}
+
+// curriculum.js
+// Original curriculum. Planned units are intentionally distinct from runnable labs.
+const prerequisite='https://himasudo.github.io/memory-system-interactive/';
+const tracks=[
+ {id:'start',n:'00',title:'Start here',group:'Foundation',level:'Orientation',desc:'Learn the workbench. Make a prediction, stop the machine, and follow the evidence.',units:['The investigation loop','Registers, memory, and evidence','Using the debugger','Reproducing and reporting a result'],labs:['first-stop'],prereqs:[]},
+ {id:'assembly',n:'01',title:'Assembly & the ABI',group:'Foundation',level:'Foundation → advanced',desc:'From one instruction to the contracts between compiled functions.',units:['Instruction encodings','Register widths and aliasing','Arithmetic and flags','Signed and unsigned control flow','Address calculation and data layout','Loops and boundary conditions','Stack frames and call/return','System V AMD64 ABI','Floating point and SIMD','AArch64 and its calling convention'],labs:['register-widths','signed-branches','address-arithmetic','loop-boundary','call-contract'],prereqs:['start']},
+ {id:'reversing',n:'02',title:'Reverse engineering',group:'Security',level:'Foundation → advanced',desc:'Recover behavior from bytes. Separate observation from a convincing guess.',units:['Static versus dynamic analysis','Recovering predicates','Inferring structures','Optimized and stripped binaries','Control-flow graphs','C++ objects, RTTI, and exceptions','Decompilation and its failure modes','Binary diffing and patch analysis'],labs:['recover-predicate','structure-layout'],prereqs:['assembly']},
+ {id:'crackmes',n:'03',title:'Crackmes',group:'Security',level:'Progressive challenges',desc:'Original puzzles that make you reconstruct a program’s rules.',units:['One predicate','Multiple independent gates','Checksum and state-machine puzzles','Constraint-based solving','Obfuscation and opaque predicates','Virtual-machine reversing'],labs:['three-gates'],prereqs:['reversing']},
+ {id:'shellcoding',n:'04',title:'Shellcoding',group:'Security',level:'Foundation → advanced',desc:'Understand executable bytes, operating-system boundaries, and payload constraints.',units:['A syscall without libc','Instruction bytes and restrictions','Position independence','i386 and x86-64 syscall conventions','Restricted-byte exercises','Controlled payload execution and mitigations'],labs:['write-without-libc'],prereqs:['assembly']},
+ {id:'vulnerabilities',n:'05',title:'Vulnerability classes',group:'Security',level:'Foundation → advanced',desc:'Find the broken invariant behind overflows, lifetime errors, and races.',units:['Object bounds versus mapped memory','Integer overflow and conversions','Stack and heap overflows','Use-after-free and double-free','Format strings','Uninitialized memory and information leaks','Race conditions and TOCTOU','Root-cause repair and regression testing'],labs:['bounds-before-load'],prereqs:['assembly']},
+ {id:'binary',n:'06',title:'Binary exploitation',group:'Security',level:'Intermediate → advanced',desc:'Follow corruption into control flow in deliberately vulnerable lab programs.',units:['Saved return addresses and ret2win','pwntools and binary I/O','Finding offsets and constructing inputs','Leaks and ASLR','ret2libc','GOT/PLT and RELRO','ROP and stack pivots','Canaries, PIE, NX, and CFI','Reliability, failure analysis, and repairs'],labs:['saved-return'],prereqs:['vulnerabilities','reversing','shellcoding']},
+ {id:'heap',n:'07',title:'Heap exploitation',group:'Security',level:'Intermediate → advanced',desc:'Read allocator state before studying what corruption can make it do.',units:['Build an allocator','Chunks, bins, and invariants','Pinned glibc allocator versions','Tcache and double-free','Tcache poisoning and safe-linking','House of spirit and house of force (historical)','Unsafe unlink and its checks (historical)','Lifetime design and exploit-resistant repair'],labs:[],prereqs:['binary','c-boundaries']},
+ {id:'triage',n:'08',title:'Crash triage & sanitizers',group:'Security',level:'Intermediate',desc:'Turn a crash into a minimized reproducer and an explained fix.',units:['Fault classification','Core dumps and unwinding','ASan and UBSan','MSan and TSan constraints','Reproducer minimization','Crash deduplication','Regression testing a repair'],labs:[],prereqs:['vulnerabilities']},
+ {id:'fuzzing',n:'09',title:'Fuzzing',group:'Security',level:'Intermediate → advanced',desc:'Build harnesses, measure coverage, and investigate what the fuzzer finds.',units:['Harness boundaries and determinism','Coverage feedback','Corpus selection and minimization','Mutation and structured inputs','Stateful protocol fuzzing','Differential and metamorphic fuzzing','Crash triage and regression corpora','Measuring campaign quality'],labs:[],prereqs:['triage']},
+ {id:'trustzone',n:'10',title:'ARM TrustZone',group:'Security',level:'Advanced · VM track',desc:'Study world separation and the boundary between trusted and untrusted software.',units:['Threat model and architecture','Secure and Normal worlds','Secure monitor calls','Trusted applications','Shared-memory validation','OP-TEE lab environment','Controlled TEE memory corruption','Mitigations and boundary repair'],labs:[],prereqs:['assembly','vulnerabilities','virtualization']},
+ {id:'kernel',n:'11',title:'Kernel exploitation',group:'Security',level:'Advanced · VM track',desc:'Investigate deliberately vulnerable kernels and drivers inside disposable machines.',units:['Kernel address spaces and privileges','Kernel debugging and Oops analysis','A deliberately vulnerable driver','Null dereferences and historical assumptions','Kernel lifetime bugs','Controlled privilege-boundary exercises','KASLR, SMEP/SMAP, and allocator defenses','Patch analysis and regression tests'],labs:[],prereqs:['binary','linux','heap']},
+ {id:'c-boundaries',n:'12',title:'C & C++ boundaries',group:'Systems',level:'Intermediate → advanced',desc:'Connect the language’s rules to the machine’s behavior.',units:['Object representation and padding','Lifetime and pointer provenance','Integer promotions and conversions','Undefined behavior and optimization','Aliasing and effective types','C++ object lifetime and virtual dispatch','Sanitizer coverage and blind spots'],labs:[],prereqs:['assembly']},
+ {id:'toolchain',n:'13',title:'From source to process',group:'Systems',level:'Intermediate → advanced',desc:'Take apart compilation, ELF, linking, loading, and startup.',units:['Preprocessing and translation units','Compiler IR and optimization','Object files and symbols','Relocations and linkers','ELF segments versus sections','Dynamic loading and symbol resolution','GOT/PLT and thread-local storage','Process startup and DWARF'],labs:[],prereqs:['assembly']},
+ {id:'concurrency',n:'14',title:'Concurrency & memory models',group:'Systems',level:'Intermediate → advanced',desc:'Reason about visibility, lifetime, and progress across threads.',units:['Language versus hardware memory models','Happens-before and data races','Acquire/release and sequential consistency','Litmus tests','Mutexes and futexes','Deadlock and progress guarantees','Lock-free queues and ABA','Hazard pointers, epochs, and RCU'],labs:[],prereqs:['c-boundaries']},
+ {id:'linux',n:'15',title:'Linux internals',group:'Systems',level:'Intermediate → advanced',desc:'Trace the operating-system mechanisms behind everyday programs.',units:['Syscall entry and return','Processes, threads, and scheduling','Signals and interrupted calls','File descriptors and open file descriptions','Virtual-memory policy','Namespaces and cgroups','Seccomp and capabilities','Tracing kernel/user transitions'],labs:[],prereqs:['toolchain']},
+ {id:'io',n:'16',title:'Networking & storage',group:'Systems',level:'Intermediate → advanced',desc:'Build correct I/O around partial work, backpressure, and failure.',units:['Socket lifetime and partial I/O','epoll and readiness','Backpressure and queues','Zero-copy tradeoffs','Filesystem caching','fsync and durable updates','Write-ahead logging','Crash consistency and fault injection'],labs:[],prereqs:['linux','concurrency']},
+ {id:'performance',n:'17',title:'Performance investigation',group:'Systems',level:'Advanced · native measurements',desc:'Make measurements that can distinguish explanations.',units:['Experimental design and confounders','Profiling and sampling','PMU access and limitations','Assembly and vectorization','False sharing and contention','NUMA placement','Branch behavior','Reporting reproducible evidence'],labs:[],prereqs:['assembly','concurrency']},
+ {id:'symbolic',n:'18',title:'Symbolic execution',group:'Research',level:'Advanced',desc:'Express path conditions and understand where solver-driven analysis breaks down.',units:['Symbolic values and constraints','Path predicates','SMT and bit vectors','Concolic execution','Path explosion','Environment modeling','Solving original crackmes','False confidence and validation'],labs:[],prereqs:['crackmes','c-boundaries']},
+ {id:'ebpf',n:'19',title:'eBPF & verifier reasoning',group:'Research',level:'Advanced · VM track',desc:'Inspect verifier state, bounds, and helper contracts.',units:['eBPF execution model','Register types and ranges','Verifier state exploration','Maps and helper contracts','Tracing labs','Rejected-program investigations','Published patch case studies'],labs:[],prereqs:['linux','vulnerabilities']},
+ {id:'virtualization',n:'20',title:'Virtualization & isolation',group:'Research',level:'Advanced · VM track',desc:'Understand the boundaries between guests, kernels, and devices.',units:['Guest/host execution','Nested address translation','VM exits','Device emulation','Virtio queues','Snapshot and replay workflows','Isolation threat models'],labs:[],prereqs:['linux']},
+ {id:'microarchitecture',n:'21',title:'Microarchitectural security',group:'Research',level:'Advanced · measured experiments',desc:'Connect cache and speculation mechanisms to information leakage.',units:['Architectural versus microarchitectural state','Timing and measurement noise','Cache side-channel models','Speculative execution','Controlled published case studies','Mitigation tradeoffs','Limits of emulation and inference'],labs:[],prereqs:['performance','vulnerabilities']}
+];
+const trackById=id=>tracks.find(t=>t.id===id);
+
+// lessons.js
+const sources={
+ intel:{label:'Intel instruction reference',url:'https://intel.github.io/SDM/sdm.html'},
+ abi:{label:'System V AMD64 ABI',url:'https://gitlab.com/x86-psABIs/x86-64-ABI'},
+ gas:{label:'GNU assembler: Intel syntax',url:'https://sourceware.org/binutils/docs/as/i386_002dVariations.html'},
+ memory:{label:'Prerequisite · Memory Systems Lab',url:'https://himasudo.github.io/memory-system-interactive/'},
+ syscall:{label:'Linux x86-64 syscall table',url:'https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl'}
+};
+const section=(title,...p)=>({title,p});
+const retValue=(m,x)=>m.regs[0]===unsigned(x);
+const lessons=[
+{
+ id:'first-stop',track:'start',title:'Your first breakpoint',subtitle:'Make the machine explain itself.',duration:20,difficulty:'Orientation',input:'7',inputLabel:'Argument n (EDI)',mode:'repair',
+ goal:'Repair a function so it returns 2 × n for every tested 32-bit input.',
+ starter:`entry:
+    mov eax, edi
+    add eax, 1
+    ret`,
+ solution:`entry:
+    mov eax, edi
+    add eax, edi
+    ret`,
+ initial:n=>({edi:n}),cases:[0n,1n,7n,41n,0x80000000n,0xffffffffn],check:(m,n)=>retValue(m,unsigned(n*2n,32)),
+ sections:[
+ section('A prediction before a button','The function receives an unsigned 32-bit argument in <code>EDI</code> and returns a result in <code>EAX</code>. For n = 7, the specification says 14. Read the three instructions and write down what you think they actually produce. Intel syntax places the destination first: <code>mov eax, edi</code> copies the argument into the result register. It does not erase EDI.','This workbench assembles your text into real x86-64 instruction bytes. A bounded teaching engine decodes those bytes and executes its supported subset. It has no native Linux process, hardware timing, or external network. Open Engine reference for exact boundaries. Those boundaries matter when interpreting an observation.'),
+ section('Stop before the wrong change','Select <strong>Build</strong>, then click the hollow breakpoint circle beside <code>add</code> in the disassembly. <strong>Run</strong> stops before that instruction. RIP is the address of the next instruction to execute. At this point EAX and EDI should both hold 7.','Select <strong>Step</strong>. EAX becomes 8. The debugger highlights changed registers; flags also change because ADD is arithmetic. <strong>Back</strong> restores the preceding state, including memory writes. The history keeps the most recent 512 steps; it is a teaching convenience rather than a claim about native debugger recording.'),
+ section('Build a causal explanation','The observed result follows from an immediate operand of 1. We wanted a second copy of n. Replace that immediate with EDI, rebuild, and repeat the experiment. Editing text does not silently change the loaded program: the source becomes dirty and execution requires a new build.','Run to the final RET. The harness supplied a synthetic return address on the stack; returning to it completes this function. The output pane reports the final result. There is no printed output unless a lesson explicitly writes to the modeled console.'),
+ section('A repair is a general claim','Select <strong>Verify repair</strong>. Verification executes fresh machines across inputs, including zero and a value whose doubled result wraps at 32 bits. Passing one example is weaker evidence than satisfying the specified arithmetic across boundary cases.','Local exercise checks are visible in this open-source project. They are learning feedback, not a secure exam grader or proof of correctness for all possible programs. Try a different n yourself and explain the result before you run it.'),
+ section('Carry this method forward','Use the same sequence throughout the course: state the contract, predict a result, stop near the first divergence, inspect the relevant state, repair the cause, then test the boundary. A debugger shows evidence; your explanation connects that evidence to the program.','Your saved source, input, and completed exercises stay in this browser. Export progress from the Progress page to move them to another device. Nothing is uploaded by the workbench.')],
+ hints:['After MOV, EAX already contains one copy of n.','ADD can take a register as its second operand. Which register still contains n?','Use add eax, edi, then rebuild and verify.'],
+ quiz:{q:'When an address breakpoint is hit, has the instruction at that address executed?',options:['Yes; the state shows its result.','No; RIP identifies the instruction that will execute next.','Only if the instruction changes flags.'],answer:1,why:'An address breakpoint stops before execution. A write watchpoint in this workbench stops after the matching instruction, so its changed bytes are visible.'},refs:['intel','abi']
+},
+{
+ id:'register-widths',track:'assembly',title:'One register, four widths',subtitle:'Why writing EAX changes more than 32 bits.',duration:30,difficulty:'Foundation',input:'42',inputLabel:'Low 32-bit value (EDI)',mode:'repair',
+ goal:'Return the unsigned low 32 bits of EDI in the full RAX register, independently of its old high bits.',
+ starter:`entry:
+    mov ax, di
+    ret`,solution:`entry:
+    mov eax, edi
+    ret`,
+ initial:n=>({rax:0xfeedface12345678n,rdi:n}),cases:[0n,42n,0x12345678n,0x80000000n,0xffffffffn],check:(m,n)=>retValue(m,unsigned(n,32)),
+ sections:[section('Names are overlapping views','RAX is a 64-bit register. EAX names its low 32 bits; AX names its low 16; AL names its low 8. They are overlapping views, not independent storage. If you change AL, a later read of RAX sees that change. The rest of RAX depends on the width of the write.','The laboratory initializes RAX to <code>0xfeedface12345678</code>. The function should replace it with the zero-extended 32-bit input. Step MOV AX, DI and inspect the entire 16-digit hexadecimal RAX value. The low 16 bits changed, but the old upper bits survived.'),
+ section('The architectural 32-bit rule','In 64-bit mode, a general-purpose 32-bit register write zeroes the upper 32 bits of the corresponding 64-bit register. An 8-bit or 16-bit write preserves the other bits. This is an architectural rule you can rely on, not an optimization that happens only on one vendor’s processor.','Change AX/DI to EAX/EDI. With input 42, the full result becomes <code>0x000000000000002a</code>. With input 0xffffffff, it becomes <code>0x00000000ffffffff</code>. This is zero-extension, not sign-extension; the second value is positive when read as a signed 64-bit integer.'),
+ section('A width is part of the operation','A register name chooses an operand width. <code>add eax, edi</code> computes a 32-bit result and then zeroes the upper half of RAX. <code>add rax, rdi</code> computes a 64-bit result. The same-looking source change can therefore change arithmetic and the final bit pattern.','MOV preserves the arithmetic flags. If a flag appears unchanged after this instruction, that is expected. Do not infer equality or zero from old flags unless an instruction has just established them.'),
+ section('Observe, then repair','Try replacing the instruction with <code>mov al, dil</code> and predict which two hexadecimal digits can change. Rebuild and step. Next try the 16-bit and 32-bit variants with an input that has nonzero bits in every byte.','Restore the general repair and verify. A hardcoded MOV of 42 could pass your first manual example but fails the varied inputs. The engine supports low-byte names such as DIL; legacy high-byte registers AH/BH/CH/DH are deliberately outside this release’s subset.')],
+ hints:['AX writes only 16 bits and preserves the rest of RAX.','A 32-bit destination write has a special zero-extension rule in 64-bit mode.','Use mov eax, edi.'],
+ quiz:{q:'Starting with RAX = 0xffffffffffffffff, what does mov eax, 1 leave in RAX?',options:['0xffffffff00000001','0x0000000000000001','0xffffffffffff0001'],answer:1,why:'A write to EAX zeroes the high 32 bits of RAX.'},refs:['intel','memory']
+},
+{
+ id:'signed-branches',track:'assembly',title:'The same bits, two orderings',subtitle:'Catch a boundary bug in a single conditional jump.',duration:35,difficulty:'Foundation',input:'4294967295',inputLabel:'Unsigned length (EDI)',mode:'repair',
+ goal:'Return 1 exactly when the unsigned 32-bit length is at most 8; return 0 otherwise.',
+ starter:`entry:
+    cmp edi, 8
+    jle allowed
+    mov eax, 0
+    ret
+allowed:
+    mov eax, 1
+    ret`,
+ solution:`entry:
+    cmp edi, 8
+    jbe allowed
+    mov eax, 0
+    ret
+allowed:
+    mov eax, 1
+    ret`,initial:n=>({edi:n}),cases:[0n,1n,7n,8n,9n,0x7fffffffn,0x80000000n,0xffffffffn],check:(m,n)=>retValue(m,unsigned(n,32)<=8n?1n:0n),
+ sections:[section('CMP produces evidence, not a boolean','CMP performs a subtraction for the purpose of setting flags, then discards the numerical result. <code>cmp edi, 8</code> sets flags as if it had computed EDI − 8 at 32-bit width. EDI itself remains unchanged. The next branch chooses which relationship to test.','For unsigned subtraction, CF reports a borrow and ZF reports a zero result. Unsigned “below or equal” is CF or ZF. For signed ordering, SF and OF must be considered together: “less” is SF different from OF; “less or equal” additionally includes ZF.'),
+ section('A plausible check with a dangerous interpretation','The contract calls EDI an unsigned length. The starter uses JLE, which tests a signed relationship. The bit pattern 0xffffffff represents 4,294,967,295 unsigned and −1 signed. A signed comparison can therefore allow a length that should be rejected.','Set a breakpoint on the branch. Step CMP with inputs 8, 9, 0x80000000, and 0xffffffff. Read CF, ZF, SF, and OF, and predict the branch before stepping. The register’s bits never announce which interpretation the programmer intended.'),
+ section('Follow the contract through the branch','Replace JLE with the unsigned condition JBE. Rebuild for each experiment. Equal-to-limit still succeeds through ZF, smaller values succeed through CF, and values above the bound fail.','The reverse ordering is also useful: after CMP, JA means unsigned above; JG means signed greater. A function’s argument type and intended range are essential evidence when reverse engineering either instruction.'),
+ section('Extend the investigation','Try CMP with values where signed subtraction overflows. SF alone is insufficient for signed comparisons because the stored sign bit can disagree with the mathematical sign after overflow. OF supplies that missing information.','This lesson isolates a machine-level signedness error. In C, integer promotions and usual arithmetic conversions determine which comparison the compiler implements. A later language-boundary module follows those rules through generated assembly. Verification here checks unsigned boundary cases, including the sign-bit transition.')],
+ hints:['The contract says unsigned, while JLE is a signed conditional jump.','Unsigned below-or-equal uses CF or ZF.','Replace jle allowed with jbe allowed.'],quiz:{q:'Which condition implements unsigned a ≤ b after cmp a, b?',options:['SF = 1','ZF = 1 or SF ≠ OF','CF = 1 or ZF = 1'],answer:2,why:'CF represents unsigned borrow; ZF handles equality. SF/OF implement signed ordering.'},refs:['intel']
+},
+{
+ id:'address-arithmetic',track:'assembly',title:'An address is a calculation',subtitle:'Trace a scaled index into a little-endian array.',duration:35,difficulty:'Foundation',input:'2',inputLabel:'Array index (0–3)',mode:'repair',
+ goal:'Return values[index] from an array of four 64-bit integers.',
+ starter:`entry:
+    lea rsi, [values]
+    mov rax, qword ptr [rsi+rdi*4]
+    ret
+.data
+values:
+    .quad 3, 7, 11, 19`,
+ solution:`entry:
+    lea rsi, [values]
+    mov rax, qword ptr [rsi+rdi*8]
+    ret
+.data
+values:
+    .quad 3, 7, 11, 19`,initial:n=>({rdi:n}),cases:[0n,1n,2n,3n],check:(m,n)=>retValue(m,[3n,7n,11n,19n][Number(n)]),
+ sections:[section('Separate address formation from memory access','The expression <code>[rsi+rdi*4]</code> combines a base, an index, and a scale. Memory is byte-addressed. If the base is 0x2000 and the index is 2, the expression selects address 0x2008. The operand width then determines how many bytes MOV reads from that address.','A QWORD is eight bytes. Loading eight bytes does not automatically multiply the index by eight: element size and operand width are separate choices in the instruction. The starter therefore selects the wrong element, or a sequence crossing two elements.'),
+ section('Read the bytes in order','Open Memory at 0x2000. The first QWORD, 3, appears as <code>03 00 00 00 00 00 00 00</code>. A little-endian load treats the lowest-addressed byte as the least significant. At index 1 the broken expression starts four bytes into the first element and reads across into the second.','With the supplied values, that misaligned read is still inside mapped memory. The engine executes it; there is no automatic “wrong array element” exception. Real x86 also supports ordinary unaligned integer loads, although other instruction types and access boundaries can impose additional restrictions.'),
+ section('LEA does not read the addressed bytes','LEA computes an address expression and writes the result to a register. It does not dereference the memory operand and does not update arithmetic flags. In this program, it places the address of values into RSI. The following MOV performs the memory access.','Try replacing the load temporarily with <code>lea rax, [rsi+rdi*8]</code>. You should obtain an address rather than the element’s value. This is a useful experiment for separating pointer computation from dereferencing.'),
+ section('Repair the scale, preserve the width','The element stride is eight bytes, so use a scale of 8 while retaining the QWORD load. Check every valid index. Index zero alone hides the bug because multiplying zero by either stride gives the same address.','The verification contract for this exercise only covers indices 0–3. The later object-bounds lesson adds validation for untrusted indices. The region addresses here belong to the teaching machine; native processes have their own mapped addresses and relocations.')],hints:['QWORD selects an 8-byte load; it does not determine the index scale.','The distance between adjacent .quad elements is 8 bytes.','Change rdi*4 to rdi*8.'],quiz:{q:'What does lea rax, [rsi+rdi*8] put in RAX?',options:['The value stored at that address','The computed address','Eight consecutive array elements'],answer:1,why:'LEA calculates an effective address without dereferencing it.'},refs:['intel','memory']
+},
+{
+ id:'loop-boundary',track:'assembly',title:'Find the missing iteration',subtitle:'Use an invariant to repair a loop, including zero.',duration:40,difficulty:'Foundation',input:'5',inputLabel:'n (0–32)',mode:'repair',
+ goal:'Return 1 + 2 + … + n, with a result of 0 when n is 0. Supported input domain: 0–32.',
+ starter:`entry:
+    xor eax, eax
+    mov ecx, 1
+again:
+    add eax, ecx
+    inc ecx
+    cmp ecx, edi
+    jl again
+    ret`,
+ solution:`entry:
+    xor eax, eax
+    mov ecx, 1
+again:
+    cmp ecx, edi
+    jg done
+    add eax, ecx
+    inc ecx
+    jmp again
+done:
+    ret`,initial:n=>({edi:n}),cases:[0n,1n,2n,5n,16n,32n],check:(m,n)=>retValue(m,n*(n+1n)/2n),
+ sections:[section('Name the state at the loop boundary','Let ECX be the next integer to add and EAX the sum of all integers already added. At the top of a correct loop, the invariant is EAX = 1 + … + (ECX − 1). Initialization with EAX = 0 and ECX = 1 satisfies it.','Set a breakpoint on ADD. Each stop gives a snapshot of this invariant. Single-step through the update, increment, comparison, and branch. Count actual additions rather than estimating from the source indentation.'),
+ section('Two failures can hide in one condition','For n = 5, the starter omits the final addition. After adding 4 it increments ECX to 5, compares 5 with 5, and the strict JL fails. Changing JL to JLE repairs that case, but n = 0 still executes the body once and returns 1.','This is a post-tested loop. A zero-iteration input needs a condition before the first body execution, or a separate entry guard. Testing only a normal positive n cannot distinguish these cases.'),
+ section('Put the contract at the boundary','One clear repair tests ECX > n before ADD. If true, it returns; otherwise it adds ECX and advances. The original invariant then explains correctness: when the loop exits, all values through n have been added exactly once.','The inputs for this exercise are deliberately small nonnegative integers. This keeps focus on loop boundaries. A production implementation would also define behavior for negative n, values outside the domain, and arithmetic overflow; silently expanding the domain would change the specification.'),
+ section('Debug termination as well as output','Try removing the increment and running. The workbench pauses at its instruction budget rather than freezing the page forever. A budget pause is not a successful return. Verification treats nontermination within its bound as failure.','Use Back to compare neighboring loop states. If the loop-control state never moves toward the exit condition, an output-only explanation is incomplete. Finish by verifying n = 0, 1, and several larger values.')],hints:['Changing JL to JLE fixes positive n but still fails n = 0.','Move the comparison before ADD so zero iterations are possible.','At again: compare ECX with EDI; JG done; then ADD, INC, and JMP again.'],quiz:{q:'Why does testing n = 0 matter here?',options:['It checks whether the loop can execute zero times.','It forces signed overflow.','It checks whether INC changes CF.'],answer:0,why:'A post-tested loop executes its body once before checking whether work was needed.'},refs:['intel']
+},
+{
+ id:'call-contract',track:'assembly',title:'A function owes its caller',subtitle:'A correct return value can still violate the ABI.',duration:40,difficulty:'Intermediate',input:'17',inputLabel:'First addend (RDI)',mode:'repair',
+ goal:'Return RDI + RSI while preserving the caller’s RBX value and balancing the stack. RSI is 9.',
+ starter:`entry:
+    sub rsp, 8
+    call add_pair
+    add rsp, 8
+    ret
+add_pair:
+    mov rbx, rdi
+    add rbx, rsi
+    mov rax, rbx
+    ret`,
+ solution:`entry:
+    sub rsp, 8
+    call add_pair
+    add rsp, 8
+    ret
+add_pair:
+    push rbx
+    mov rbx, rdi
+    add rbx, rsi
+    mov rax, rbx
+    pop rbx
+    ret`,initial:n=>({rdi:n,rsi:9n,rbx:0x1122334455667788n}),cases:[0n,17n,100n,0xfffffffffffffff0n],check:(m,n)=>retValue(m,n+9n)&&m.regs[3]===0x1122334455667788n&&m.regs[4]===BigInt(STACK+8),
+ sections:[section('An ABI is an agreement between independently compiled code','For ordinary integer arguments in the System V AMD64 convention, RDI and RSI carry the first two arguments and RAX carries an integer return value. The convention also divides registers into ones the callee may clobber and ones it must preserve. RBX is callee-saved.','The starter computes the right sum in RAX but destroys the caller’s RBX. A caller may keep a live value there across a call. If that value changes, failure may appear far away from this function, after the result has already been used.'),
+ section('CALL and RET manipulate concrete bytes','CALL pushes the address after the call onto the stack, then transfers control. RET reads an address from the stack and transfers to it. Neither instruction understands a C function declaration or checks whether an ABI was obeyed.','Inspect the stack before and after CALL. The synthetic function-entry stack starts at an address congruent to 8 modulo 16. The caller subtracts 8 before its nested CALL so the pre-call stack is 16-byte aligned, as required for this ordinary call. The callee then enters with its return address on the stack.'),
+ section('Preserve what you borrow','One repair saves RBX with PUSH at add_pair’s entry, performs the computation, then restores RBX with POP before RET. The stack must be restored in the reverse order of saves. Missing the POP makes RET consume the saved RBX value as an address.','Another repair can use a caller-saved scratch register instead. Verification checks the observable contract, not whether your source matches a preferred solution. The Calls panel is an explanatory record of CALL/RET events; it is not a DWARF unwinder and can lose correspondence when return addresses are corrupted.'),
+ section('Expand the evidence','Check RAX, RBX, and RSP at the final return. A result-only test would miss the original error. Changing a callee-saved register temporarily is legal if it is restored before the caller resumes.','The full ABI includes more than this lesson: additional preserved registers, floating/vector arguments, aggregates, variadic calls, red-zone rules, and unwinding. Those remain explicit units in the track. Here the experiment isolates preservation, alignment, and return-address lifetime.')],hints:['RBX belongs to the caller across this call. Save it before changing it.','PUSH RBX at add_pair entry must be balanced with POP RBX before RET.','You may also compute directly in RAX without using RBX.'],quiz:{q:'A function returns the right RAX but unexpectedly changes RBX. Is it correct under this contract?',options:['Yes; only the return value matters.','No; preserving RBX is part of the function’s interface.','Yes, if the function has fewer than six arguments.'],answer:1,why:'The caller may rely on callee-saved register values after the call.'},refs:['abi','intel']
+},
+{
+ id:'recover-predicate',track:'reversing',title:'Recover a hidden predicate',subtitle:'Undo a byte transformation using observed state.',duration:35,difficulty:'Intermediate',input:'0',inputLabel:'Candidate byte (0–255)',mode:'solve',
+ goal:'Find an input byte accepted by the original validator. Verification always runs the original bytes, even if you edit your scratch program.',
+ starter:`entry:
+    mov eax, edi
+    xor al, 0x5a
+    add al, 7
+    cmp al, 0xa0
+    jne denied
+    mov eax, 1
+    ret
+denied:
+    xor eax, eax
+    ret`,answer:'195',initial:n=>({edi:n}),check:(m,n)=>n>=0n&&n<=255n&&retValue(m,1n),
+ sections:[section('Translate the data flow, not the spelling','There is no C source here. Read the instruction sequence and reconstruct a relation between the input and the accepted state. MOV transfers the input to EAX; the following XOR and ADD operate only on AL. Therefore the relevant arithmetic is on the low byte, modulo 256.','A successful branch requires <code>((input XOR 0x5a) + 7) mod 256 = 0xa0</code>. This equation is a hypothesis extracted from the instructions. Stepping several candidates is how you check that your interpretation matches execution.'),
+ section('Walk backward from the comparison','Subtract 7 from the target byte, modulo 256. The result is 0x99. XOR is its own inverse, so XOR that value with 0x5a. This reconstructs the candidate before either transformation.','Use the Candidate field to load your value, rebuild, and break before CMP. AL should equal 0xa0. Step CMP and inspect ZF. Then step JNE: a not-equal branch should not be taken when ZF is set.'),
+ section('A local patch is a different claim','You can edit the scratch program to learn how a branch behaves. Replacing the failure path with a success return demonstrates a patch, but it does not prove you recovered a valid input. The Solve check therefore executes the original validator with your candidate.','This distinction matters in reversing: “I can modify my copy” and “I understand the original acceptance condition” are separate achievements. In later crackmes, several constraints and state transitions must all hold.'),
+ section('Width determines the algebra','If the ADD were on EAX, carries could propagate beyond the low byte. If the comparison were on the full register, preserved high bits could matter. An algebraic solution must retain the widths seen in the instructions.','Try a deliberately wrong candidate that differs by one bit. Track how XOR and addition affect it. Keep a concise explanation of which state made the branch choose rejection; naming the final input alone does not explain the program.')],hints:['AL must be 0xa0 immediately before CMP. Undo ADD first.','0xa0 − 7 = 0x99; XOR is its own inverse.','0x99 XOR 0x5a = 0xc3, or 195 decimal.'],quiz:{q:'Why is the transformation modulo 256?',options:['Every x86 register is 8 bits.','The arithmetic destination is AL, an 8-bit register view.','CMP always truncates its operands to a byte.'],answer:1,why:'The operand width determines where this addition wraps.'},refs:['intel']
+},
+{
+ id:'structure-layout',track:'reversing',title:'Recover a field from its offset',subtitle:'Distinguish a useful layout hypothesis from a guessed type.',duration:35,difficulty:'Intermediate',input:'1234605616436508552',inputLabel:'Value stored in the third field',mode:'repair',
+ goal:'Return the 64-bit value at byte offset 16 in the record addressed by RDI.',
+ starter:`entry:
+    mov rax, qword ptr [rdi+8]
+    ret
+.data
+record:
+    .quad 0x54444c42, 24, 0`,solution:`entry:
+    mov rax, qword ptr [rdi+16]
+    ret
+.data
+record:
+    .quad 0x54444c42, 24, 0`,initial:()=>({rdi:DATA}),setup:(m,n)=>{m.writeMem(DATA+16,64,n);m.writes=[];},cases:[0n,42n,0x1122334455667788n,0xffffffffffffffffn],check:(m,n)=>retValue(m,n),
+ sections:[section('An offset is stronger evidence than a field name','A binary load gives you a base, a displacement, and a width. <code>mov rax, qword ptr [rdi+8]</code> reads eight bytes starting eight bytes after RDI. It does not reveal whether those bytes were called length, timestamp, or pointer in the original source.','This exercise supplies a contract: a record has three consecutive 64-bit fields, and the requested value is the third. The first is a marker, the second stores 24, and the third is populated from the Input field by the harness.'),
+ section('Validate the layout against bytes','Inspect memory at 0x2000, 0x2008, and 0x2010. The marker, size-like value, and candidate occupy separate eight-byte spans. Predict what RAX receives with the starter offset. Then stop on MOV and check.','A little-endian byte sequence can look reversed when read as text. The byte at the lowest address is the least significant part of the integer. Keep address order and numeric display order separate in your notes.'),
+ section('A structure may contain padding','This record uses three equally sized fields, so its offsets are straightforward. General C structures can contain padding between members and at the end to satisfy alignment. Field order alone is insufficient to determine offsets without the relevant ABI and types.','In real reversing, gather uses of the same base pointer: load widths, offsets, arithmetic, and comparisons constrain possible layouts. Several source structures can fit the same observed accesses. State what the evidence supports and what remains unknown.'),
+ section('Repair one access, then vary the data','Change the displacement to 16 and verify with several values, including one with every byte different and one with every bit set. This avoids passing by accidentally returning a constant that matches the current record.','The fixture writes the chosen value into memory before execution. The program must load it through the pointer; a repaired source file does not contain the test values. Later units connect these observations to debug information, C++ inheritance, vtables, and optimized access patterns.')],hints:['The displacement is measured in bytes.','There are two eight-byte fields before the desired value.','Load qword ptr [rdi+16].'],quiz:{q:'Does an 8-byte load at offset 16 prove the original member was named value?',options:['Yes; the instruction encodes its name.','No; it establishes an access width and offset, not the source-level name.','Only on little-endian machines.'],answer:1,why:'Names and some types may be absent from a stripped binary. Access patterns constrain hypotheses.'},refs:['intel','abi']
+},
+{
+ id:'three-gates',track:'crackmes',title:'Three gates, one key',subtitle:'Keep every path constraint in view.',duration:40,difficulty:'Intermediate',input:'256',inputLabel:'Candidate key (0–65535)',mode:'solve',goal:'Find a key accepted by the unmodified three-gate validator.',
+ starter:`entry:
+    cmp edi, 0x100
+    jbe denied
+    mov eax, edi
+    and eax, 0xff
+    cmp eax, 0x5a
+    jne denied
+    mov eax, edi
+    shr eax, 8
+    cmp eax, 3
+    jne denied
+    mov eax, 1
+    ret
+denied:
+    xor eax, eax
+    ret`,answer:'858',initial:n=>({edi:n}),check:(m,n)=>n>=0n&&n<=65535n&&retValue(m,1n),
+ sections:[section('Acceptance is the intersection of conditions','A successful input must pass every gate. The first requires an unsigned value greater than 0x100. The second masks with 0xff and compares the low byte with 0x5a. The third shifts a fresh copy of the input right by eight bits and compares the remaining value with 3.','Write these conditions separately. Solving the low-byte condition alone produces many candidates, and satisfying the first threshold says almost nothing about the other gates.'),
+ section('Keep track of overwritten registers','EAX is scratch state. After AND it contains only the low byte; before SHR, MOV reloads the original input. Missing that reload would lead to a very different—and impossible—interpretation of the final condition.','Set breakpoints at all three comparisons. Run candidate values and record the first failing gate. Inspect the transformed value at each stop, not just the final return. This turns an opaque rejection into a precise explanation.'),
+ section('Combine the constraints','The third condition selects an upper portion of 3. The second selects a low byte of 0x5a. Combining them gives 0x35a. Check that it also satisfies the first unsigned threshold. Then enter the candidate, rebuild, and run through the success path.','Verification uses the original validator, so changing a conditional jump in the editor does not count as solving the puzzle. The editor remains useful for counterfactual experiments.'),
+ section('Generalize without overclaiming','This puzzle has independent bit constraints and a small solution. Real validators may couple bytes through carries, checksums, state machines, or table lookups. Recovering the control flow and tracking data dependencies remain useful even when simple algebra stops being sufficient.','Later crackmes introduce those complications progressively, followed by symbolic execution with explicit limits on environment modeling and path explosion. A tool-generated key still needs validation against the original program.')],hints:['Gate two fixes the low byte to 0x5a.','Gate three fixes the value after shifting right by 8 to 3.','Combine (3 << 8) | 0x5a = 0x35a = 858.'],quiz:{q:'Why does the second mov eax, edi matter?',options:['It restores the original input before the next transformation.','It converts a signed number to a different bit pattern.','It clears every arithmetic flag.'],answer:0,why:'The mask destroyed most of the first copy, so the next gate reloads its own copy.'},refs:['intel']
+},
+{
+ id:'write-without-libc',track:'shellcoding',title:'A write without libc',subtitle:'Follow registers across a modeled syscall boundary.',duration:35,difficulty:'Intermediate',input:'0',inputLabel:'Unused input',mode:'repair',goal:'Write exactly “hello” followed by a newline to the modeled console, then exit with status 0.',
+ starter:`entry:
+    mov eax, 1
+    mov edi, 1
+    lea rsi, [message]
+    mov edx, 4
+    syscall
+    mov eax, 60
+    xor edi, edi
+    syscall
+.data
+message:
+    .ascii "hello\\n"`,
+ solution:`entry:
+    mov eax, 1
+    mov edi, 1
+    lea rsi, [message]
+    mov edx, 6
+    syscall
+    mov eax, 60
+    xor edi, edi
+    syscall
+.data
+message:
+    .ascii "hello\\n"`,initial:()=>({}),cases:[0n],check:m=>m.output==='hello\n'&&m.reason==='Modeled exit(0)',
+ sections:[section('A syscall has its own calling convention','The Linux x86-64 syscall convention places a number in RAX and the first three arguments in RDI, RSI, and RDX. This lesson models write(number 1) and exit(number 60). It performs no actual host system call. The supported boundary is deliberately small and documented.','For write, RDI selects a descriptor, RSI points to bytes, and RDX gives their count. Here descriptor 1 means the laboratory console. A pointer does not encode the length of its data.'),
+ section('A string is bytes plus a convention','The message contains h, e, l, l, o, and a newline: six bytes. The starter requests four, so the console receives only “hell”. WRITE does not keep reading until a NUL byte; its count controls the requested span.','Inspect the message in Memory, then break before SYSCALL. Verify RSI points at its first byte and RDX names the intended span. Change the count to six, rebuild, and observe the complete output.'),
+ section('Observe the boundary effects','The modeled successful WRITE returns the number of bytes written in RAX. SYSCALL also clobbers RCX and R11 according to the instruction’s return-address/flags convention. That matters when code keeps live values across a syscall boundary.','This laboratory always completes an allowed write in full. Native Linux can report short writes, interruptions, or errors, so a real write loop needs more handling. The Networking & Storage track covers those semantics. Do not generalize this simplified successful-write model into a production I/O contract.'),
+ section('Machine code is not automatically portable shellcode','The emitted code is real x86-64 encoding, but the current message address belongs to this fixture. Moving the bytes elsewhere without adjusting absolute addresses can break them. Position independence is a separate unit, as are byte restrictions and i386 versus x86-64 conventions.','The first step in shellcoding is understanding exactly which bytes execute and which environment they assume. Export the GNU assembly to inspect it with external tools; native compilation/loading and browser fixture addresses are different environments.')],hints:['WRITE uses a byte count, not a string terminator.','“hello” is five bytes; the newline is one more.','Set EDX to 6.'],quiz:{q:'Does write(fd, pointer, count) stop automatically at a NUL byte?',options:['Yes; all output APIs do.','No; count determines the requested span.','Only when count is larger than 4.'],answer:1,why:'The system call treats the buffer as bytes. String conventions belong to higher-level APIs.'},refs:['syscall','intel']
+},
+{
+ id:'bounds-before-load',track:'vulnerabilities',title:'Mapped does not mean in bounds',subtitle:'Protect an object boundary that the CPU cannot see.',duration:45,difficulty:'Intermediate',input:'4',inputLabel:'Untrusted 64-bit index (RDI)',mode:'repair',goal:'Return values[i] for indices 0–3; return UINT64_MAX for every other tested index, before any invalid element access.',
+ starter:`entry:
+    lea rsi, [values]
+    mov rax, qword ptr [rsi+rdi*8]
+    ret
+.data
+values:
+    .quad 3, 7, 11, 19`,
+ solution:`entry:
+    cmp rdi, 4
+    jae invalid
+    lea rsi, [values]
+    mov rax, qword ptr [rsi+rdi*8]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+values:
+    .quad 3, 7, 11, 19`,initial:n=>({rdi:n}),cases:[0n,1n,2n,3n,4n,5n,128n,0xffffffffffffffffn,0x2000000000000000n],check:(m,n)=>retValue(m,n<4n?[3n,7n,11n,19n][Number(n)]:-1n),
+ sections:[section('The memory map is not an object map','The four-element array occupies 32 bytes beginning at 0x2000. The data region extends farther. An access at index 4 begins just past the array but remains in mapped memory. It can return a plausible value without a page fault.','A CPU normally enforces page permissions and address validity, not the boundaries of every C array. An out-of-bounds access can expose neighboring data or corrupt another object even when no protection exception occurs. The source-language rules and the hardware checks answer different questions.'),
+ section('Check before scaling and dereferencing','The input is a 64-bit unsigned index. Require it to be below the element count before computing and using the element address. <code>cmp rdi, 4</code> followed by <code>jae invalid</code> rejects equality and larger values.','Doing the check after the load is too late: the access already occurred. Checking only the computed pointer is also subtle because scaling and addition can wrap. A huge index can produce a small effective address after 64-bit modular arithmetic.'),
+ section('Negative text can become a large unsigned value','Enter −1 in the Input field. The harness stores its 64-bit two’s-complement representation in RDI. Under this unsigned contract that is the maximum index, so it must be rejected. A signed comparison would treat it as a small negative number and could allow it.','The repair must preserve valid behavior at index zero and the last element. Returning an error for every input avoids the bad access but violates the function’s useful contract. The verification cases check both sides of the boundary.'),
+ section('Reproduce, explain, repair','Run index 4 on the starter and inspect the returned zero. That result is from bytes beyond the object; it is not proof that the function safely supports a fifth element. Then test a huge index and observe how address formation behaves.','Add the guard and an error-return path. Verify the repaired program across ordinary, boundary, and wraparound-provoking inputs. This teaches one spatial-safety invariant. Heap lifetime, integer allocation sizes, format strings, and concurrent lifetime errors are separate units in the same track.')],hints:['The array has four entries; valid unsigned indices are strictly less than 4.','Compare RDI with 4 before the memory load, and reject with JAE.','Return mov rax, -1 on the invalid path.'],quiz:{q:'Why can reading one element past an array return a value instead of faulting?',options:['The CPU tracks every array size and extends it.','The address may remain inside a readable mapped region.','Out-of-bounds reads always return zero.'],answer:1,why:'Page permissions do not encode individual object boundaries. Zero here is just this fixture’s initialized memory.'},refs:['intel','memory']
+},
+{
+ id:'saved-return',track:'binary',title:'Who chooses the next instruction?',subtitle:'Follow a saved return address from data into control flow.',duration:45,difficulty:'Intermediate',input:'0',inputLabel:'Unused input',mode:'repair',goal:'In this deliberately vulnerable fixture, redirect the overwritten return address to win and reach its return value of 42.',
+ starter:`entry:
+    call vulnerable
+    ret
+win:
+    mov eax, 42
+    ret
+vulnerable:
+    sub rsp, 16
+    mov rax, 0
+    mov qword ptr [rsp+16], rax
+    add rsp, 16
+    ret`,
+ solution:`entry:
+    call vulnerable
+    ret
+win:
+    mov eax, 42
+    ret
+vulnerable:
+    sub rsp, 16
+    mov rax, win
+    mov qword ptr [rsp+16], rax
+    add rsp, 16
+    ret`,initial:()=>({}),cases:[0n],check:m=>retValue(m,42n)&&m.history.some(h=>h.instruction==='ret'&&h.before.rip===BigInt(m.program.instructions.at(-1).address)),
+ sections:[section('CALL leaves the future in writable memory','CALL stores its return address on the stack. The callee’s RET later reads that memory and uses it as its target. If a memory-corruption bug lets an input modify that saved address, data corruption can become a control-flow change.','This fixture makes the write explicit. It contains no external target, network access, or real process exploit. It is an inspectable model of the control-flow mechanism. The “payload” is the value loaded into RAX before the corrupting store.'),
+ section('Account for the stack adjustment','At vulnerable’s entry, RSP points to the saved return address from CALL. The function subtracts 16 to reserve local space, so the saved address now sits at <code>[rsp+16]</code>. The starter writes zero there, restores RSP, and executes RET.','Run it and observe the eventual execution fault at address zero. Rewind to the store. Set a write watchpoint on 0x7ff0, the location of this nested call’s saved return address, and rerun. The watchpoint stops after the store, letting you inspect the overwritten bytes.'),
+ section('Choose a controlled destination','The fixture’s win label identifies a function returning 42. Replace the zero immediate in the payload assignment with <code>win</code>. The assembler resolves that label into its address. Rebuild, stop before the corrupting store, and predict the next RET target.','The final RET in vulnerable now transfers to win. Win’s RET consumes the harness return address still above it on the stack, completing the exercise. The Calls panel is an event record, so corrupted return flow is best understood from actual RSP, memory, and RIP rather than an assumed source-level stack trace.'),
+ section('Understand the assumptions before generalizing','This deliberately easy fixture has known addresses, writable stack data, and no canary or control-flow integrity. It is not a demonstration of bypassing ASLR, a shadow stack, or any modern mitigation. Each changes the available assumptions and belongs to its own later unit.','After observing the redirection, repair the underlying store to target a valid local slot, such as [rsp+8], and explain why ordinary return behavior resumes. The exercise check evaluates the controlled redirection task; your follow-up repair is a separate investigation. Exploit mechanics and prevention should both follow from the same memory layout.')],hints:['After SUB RSP, 16, the saved return address is at [rsp+16].','The payload register controls the value written to that address.','Change mov rax, 0 to mov rax, win.'],quiz:{q:'What causes RET to jump to the new address?',options:['RET recognizes a function named win.','RET loads its target from the overwritten stack slot.','Writing RAX immediately changes RIP.'],answer:1,why:'The memory write changes a future control-flow operand. RET subsequently reads that operand.'},refs:['intel','abi']
+}
+];
+const lessonById=id=>lessons.find(l=>l.id===id);
+function createFixture(Machine,assemble,lesson,source,input){
+ const program=assemble(source),machine=new Machine(program,lesson.initial(input));
+ if(lesson.setup)lesson.setup(machine,input);return machine;
+}
+function verifyLesson(Machine,assemble,lesson,source,input){
+ const cases=lesson.mode==='solve'?[input]:lesson.cases;
+ const results=[];
+ for(const value of cases){
+  try{
+   const m=createFixture(Machine,assemble,lesson,lesson.mode==='solve'?lesson.starter:source,value);
+   // Continue through explicit INT3 instructions; all work shares one total budget.
+   let remaining=10000;
+   while(remaining>0&&!['halted','fault'].includes(m.status)){
+    const used=m.run({limit:remaining});remaining-=used;if(!used)break;
+   }
+   const ok=m.status==='halted'&&lesson.check(m,value);
+   results.push({input:String(value),ok,actual:'0x'+m.regs[0].toString(16),reason:ok?'Contract satisfied':m.status==='halted'?'Result or preserved state violates the contract':m.reason});
+  }catch(e){results.push({input:String(value),ok:false,reason:e.message});}
+ }
+ return {ok:results.every(x=>x.ok),results};
+}
+
+// app.js
+
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',book:'M3 4h7l2 2 2-2h7v15h-7l-2 2-2-2H3z M12 6v15',chart:'M4 20V10 M10 20V4 M16 20v-7 M22 20H2',code:'m8 5-6 7 6 7 M16 5l6 7-6 7 M14 3l-4 18',arrow:'M4 12h15 M14 6l6 6-6 6',external:'M14 3h7v7 M21 3l-9 9 M10 4H4v16h16v-6',sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M5 19l1-1 M18 6l1-1',menu:'M3 6h18 M3 12h18 M3 18h18',close:'m5 5 14 14 M19 5 5 19',play:'m8 4 12 8-12 8z',step:'m5 5 10 7-10 7z M19 5v14',back:'M8 4v16 M19 5 9 12l10 7z',build:'m14 3 7 7-4 4-7-7z M12 12 3 21 M3 17l4 4',check:'m4 12 5 5L20 6',reset:'M4 10a8 8 0 1 1 1 8 M4 3v7h7',download:'M12 3v12 M7 10l5 5 5-5 M4 17v4h16v-4',github:'M9 19c-5 1-5-2-7-2 M16 22v-4a4 4 0 0 0-1-3c4 0 6-2 6-6a5 5 0 0 0-1-3 5 5 0 0 0 0-4s-2 0-4 2a13 13 0 0 0-7 0C7 2 5 2 5 2a5 5 0 0 0 0 4 5 5 0 0 0-1 3c0 4 2 6 6 6a4 4 0 0 0-1 3v4',chip:'M6 6h12v12H6z M9 9h6v6H9z M9 2v4 M15 2v4 M9 18v4 M15 18v4 M2 9h4 M2 15h4 M18 9h4 M18 15h4',left:'M20 12H4 M10 6l-6 6 6 6',pause:'M8 4v16 M16 4v16',save:'M5 3h12l4 4v14H3V3z M7 3v6h10V3 M7 21v-8h10v8'};
+const icon=n=>`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[n]||icons.code}"/></svg>`;
+const KEY='teard0wn-lab:v1';
+let storageOK=true,state={version:1,theme:'dark',progress:{},drafts:{},quizzes:{},lastLab:null};
+try{const raw=localStorage.getItem(KEY);if(raw)state=validateState(JSON.parse(raw));}catch{storageOK=false;}
+document.documentElement.dataset.theme=state.theme;
+let current=null,machine=null,breakpoints=new Set(),watchpoints=new Set(),dirty=false,running=false,runToken=0,sectionIndex=0,inspectTab='registers',memoryBase=DATA,hints=0,solutionVisible=false,results=null,mobileTab='lesson',filter='All',query='',toastTimer;
+function validateState(v){
+ if(!v||v.version!==1||typeof v!=='object')throw new Error('Unrecognized progress format.');
+ const out={version:1,theme:v.theme==='light'?'light':'dark',progress:{},drafts:{},quizzes:{},lastLab:lessonById(v.lastLab)?v.lastLab:null};
+ for(const l of lessons){
+  const p=v.progress?.[l.id];if(p&&typeof p==='object'&&p.done===true)out.progress[l.id]={done:true,at:typeof p.at==='string'?p.at.slice(0,40):'',solutionUsed:!!p.solutionUsed};
+  const d=v.drafts?.[l.id];if(d&&typeof d==='object'&&typeof d.source==='string'&&d.source.length<=64000&&typeof d.input==='string'&&d.input.length<=80)out.drafts[l.id]={source:d.source,input:d.input};
+  if(Number.isInteger(v.quizzes?.[l.id])&&v.quizzes[l.id]>=0&&v.quizzes[l.id]<l.quiz.options.length)out.quizzes[l.id]=v.quizzes[l.id];
+ }
+ return out;
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));storageOK=true;}catch{if(storageOK)toast('Browser storage is unavailable. Export progress to keep your work.');storageOK=false;}}
+function toast(message){const t=$('#toast');t.textContent=message;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),4500);}
+function download(filename,text,type='text/plain'){const blob=text instanceof Blob?text:new Blob([text],{type});const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+function done(id){return !!state.progress[id]?.done;}
+function completed(){return lessons.filter(l=>done(l.id)).length;}
+function nextLesson(){return lessonById(state.lastLab)||lessons.find(l=>!done(l.id))||lessons[0];}
+const external=(href,label,cls='textlink')=>`<a class="${cls}" href="${href}" target="_blank" rel="noopener noreferrer">${label}${icon('external')}</a>`;
+function shell(active,crumb,body,lab=false){
+ $('#app').innerHTML=`<aside class="sidebar" id="sidebar" aria-label="Main navigation">
+ <button class="mobile-close iconbtn" id="close-menu" aria-label="Close navigation">${icon('close')}</button>
+ <a class="brand" href="#home" aria-label="teard0wn lab home"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTIiIGZpbGw9IiNkNGY3NmIiLz48cGF0aCBkPSJNMTYgMTMgNyAyNGw5IDExTTMyIDEzbDkgMTEtOSAxMU0yNyAxMWwtNiAyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTUxYjEzIiBzdHJva2Utd2lkdGg9IjMuMyIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPgo=" alt=""><div><div class="brand-name">teard0wn<span> lab</span></div><div class="brand-sub">SYSTEMS · SECURITY · RESEARCH</div></div></a>
+ <div><div class="navlabel">Workspace</div><nav class="navgroup">
+ ${[['home','grid','Overview'],['curriculum','book','Curriculum'],['progress','chart','Your progress'],['reference','chip','Engine reference']].map(([id,ic,label])=>`<a class="navitem ${active===id?'active':''}" href="#${id}" ${active===id?'aria-current="page"':''}>${icon(ic)}${label}${id==='curriculum'?`<span class="count">${tracks.length}</span>`:''}</a>`).join('')}
+ </nav></div><div><div class="navlabel">Continue learning</div><a class="navitem" href="#lab/${nextLesson().id}">${icon('play')}<span>${esc(nextLesson().title)}</span></a></div>
+ <div class="sidebar-bottom"><div class="prereq-card"><div class="eyebrow">Before you begin</div><p>Know the machine beneath the code.</p>${external(prerequisite,'Memory Systems Lab')}</div><div class="version"><span>v0.1 · foundation release</span><span>LOCAL</span></div></div></aside>
+ <header class="topbar"><div class="row"><button class="mobile-menu iconbtn" id="menu" aria-label="Open navigation" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb"><span class="path-label">teard0wn lab</span><span class="path-label">/</span><span>${esc(crumb)}</span></div></div><div class="top-right"><span class="top-note">YOUR BROWSER. YOUR WORKBENCH.</span><a class="iconbtn github-link" href="https://github.com/himasudo/teard0wn-lab" target="_blank" rel="noopener noreferrer" aria-label="Project source on GitHub">${icon('github')}</a><button class="iconbtn" id="theme" aria-label="Switch to ${state.theme==='dark'?'light':'dark'} theme">${icon('sun')}</button></div></header>
+ ${!storageOK?'<div class="main storage-warning">Local storage is unavailable. Export your progress before closing this page.</div>':''}
+ <main id="main" class="main ${lab?'lab-main':''}">${body}${lab?'':footer()}</main>`;
+ $('#theme').onclick=()=>{state.theme=state.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=state.theme;save();$('#theme').setAttribute('aria-label',`Switch to ${state.theme==='dark'?'light':'dark'} theme`);};
+ $('#menu').onclick=()=>{$('#sidebar').classList.add('open');$('#menu').setAttribute('aria-expanded','true');$('#close-menu').focus();};
+ $('#close-menu').onclick=()=>{$('#sidebar').classList.remove('open');$('#menu').setAttribute('aria-expanded','false');$('#menu').focus();};
+}
+function footer(){return '<footer class="footer"><span>teard0wn lab · Original lessons. Observable execution.</span><span>Browser workbench · No account required · Progress saved locally</span></footer>';}
+function trackCard(t){
+ const num=t.labs.length,finished=t.labs.filter(done).length;
+ return `<a class="track-card ${t.id==='assembly'?'featured':''}" href="#track/${t.id}"><div class="track-top"><span class="track-no">${t.n}</span><span class="pill ${num?'ready':'planned'}">${num?`${num} runnable ${num===1?'lab':'labs'}`:'Planned track'}</span></div><h3>${t.title}</h3><p>${t.desc}</p><div class="track-bottom"><span>${num?`${finished}/${num} complete · `:''}${t.units.length} curriculum units</span>${icon('arrow')}</div></a>`;
+}
+function drawCards(){const list=tracks.filter(t=>(filter==='All'||filter==='Runnable'&&t.labs.length||filter===t.group)&&(!query||`${t.title} ${t.desc} ${t.units.join(' ')}`.toLowerCase().includes(query.toLowerCase())));$('#track-grid').innerHTML=list.length?list.map(trackCard).join(''):'<div class="empty"><h3>No matching tracks</h3><p>Try a topic such as memory, assembly, or fuzzing.</p></div>';}
+function filters(){return `<div class="filters" aria-label="Curriculum filters">${['All','Runnable','Foundation','Security','Systems','Research'].map(x=>`<button class="filter ${filter===x?'active':''}" data-filter="${x}" aria-pressed="${filter===x}">${x}</button>`).join('')}<input type="search" class="search" id="search" placeholder="Find a topic…" aria-label="Search curriculum" value="${esc(query)}"></div><div class="track-grid" id="track-grid"></div>`;}
+function bindFilters(){$$('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;$$('[data-filter]').forEach(x=>{x.classList.toggle('active',x.dataset.filter===filter);x.setAttribute('aria-pressed',String(x.dataset.filter===filter));});drawCards();});$('#search').oninput=e=>{query=e.target.value;drawCards();};drawCards();}
+function home(){
+ const next=nextLesson();shell('home','Overview',`
+ <section class="hero"><div><div class="eyebrow"><span class="dot"></span>AN OPEN SYSTEMS & SECURITY LABORATORY</div><h1>Take it apart.<br><em>Understand every layer.</em></h1><p>Read the lesson. Change the code. Stop the machine.<br>Build an understanding you can inspect, one instruction at a time.</p><div class="hero-actions"><a class="btn primary" href="#lab/${next.id}">${completed()?'Continue learning':'Enter the workbench'}${icon('arrow')}</a><a class="btn ghost" href="#curriculum">Explore curriculum</a></div></div>
+ <div class="hero-visual" aria-label="Example debugger showing a register change"><div class="visual-bar"><span class="window-dots"><i></i><i></i><i></i></span><span>first_stop.s</span><span>x86-64</span></div><div class="visual-code"><div><span class="line">01</span>entry:</div><div><span class="line">02</span>    <b>mov</b> eax, edi</div><div class="highlight"><span class="line">→</span>    <b>add</b> eax, edi</div><div><span class="line">04</span>    <b>ret</b></div></div><div class="visual-regs"><div><span>RAX</span>0x00000007</div><div><span>RDI</span>0x00000007</div><div><span>NEXT RESULT</span>7 + 7 = 14</div></div><div class="visual-foot"><i></i>Paused before ADD · predict, then step</div></div></section>
+ <div class="statrow"><div><strong>${lessons.length}</strong><span>Runnable lessons & exercises</span></div><div><strong>${tracks.length}</strong><span>Tracks in the full curriculum</span></div><div><strong>${completed()}<span class="inline-status"> / ${lessons.length}</span></strong><span>Exercises completed</span></div><div><strong>0</strong><span>Accounts or installs to begin</span></div></div>
+ <div class="section-head"><div><div class="eyebrow">THE LEARNING PATH</div><h2>Your next layer</h2><p>Foundations first. Deep investigations ahead.</p></div><a class="textlink" href="#curriculum">Full curriculum${icon('arrow')}</a></div>
+ ${filters()}
+ <div class="notice"><strong>A foundation release with a complete direction.</strong> The ${lessons.length} runnable labs are ready to investigate. Planned tracks show their syllabus, prerequisites, and future runtime needs; they are not presented as completed courses. Your <a class="textlink" href="${prerequisite}" target="_blank" rel="noopener noreferrer">Memory Systems Lab</a> is the prerequisite.</div>`);bindFilters();
+}
+function curriculum(){shell('curriculum','Curriculum',`<div class="page-title"><div class="eyebrow">${tracks.length} TRACKS · ${tracks.reduce((n,t)=>n+t.units.length,0)} PLANNED CURRICULUM UNITS</div><h1>Follow the system down.</h1><p>All twelve tracks in the original brief, plus ten systems and research tracks. Runnable exercises and future units have separate status.</p></div>${filters()}<div class="notice"><strong>How to read this map.</strong> A curriculum unit is a topic to develop, not a claim of a finished lesson. Open a track for its runnable work and full planned scope. Advanced kernel, TrustZone, and hardware measurement labs will require appropriate isolated/native environments.</div>`);bindFilters();}
+function lessonLink(l,i){return `<a class="lesson-link" href="#lab/${l.id}"><span class="num">${String(i+1).padStart(2,'0')}</span><div><strong>${l.title}</strong><span class="meta">${l.duration} min · ${l.difficulty} · ${l.mode==='solve'?'Find the input':'Code investigation'}</span></div>${done(l.id)?`<span class="pill done">${icon('check')}Complete</span>`:icon('arrow')}</a>`;}
+function track(id){const t=trackById(id);if(!t)return notFound();shell('curriculum',t.title,`<a class="textlink" href="#curriculum">${icon('left')}Curriculum</a><div class="page-title"><div class="eyebrow">TRACK ${t.n} · ${t.level}</div><h1>${t.title}</h1><p>${t.desc}</p></div><div class="two-columns"><section><div class="section-head"><h2>Runnable labs</h2><span class="pill ${t.labs.length?'ready':'planned'}">${t.labs.length} available</span></div>${t.labs.length?`<div class="lesson-list">${t.labs.map((id,i)=>lessonLink(lessonById(id),i)).join('')}</div>`:`<div class="empty"><h3>This track is planned</h3><p>The scope is preserved below. This release does not yet contain executable lessons for this track.</p><a class="btn primary" href="#lab/first-stop">Start with a runnable lab${icon('arrow')}</a></div>`}<div class="notice"><strong>Prerequisites</strong><div class="prereq-links">${t.prereqs.length?t.prereqs.map(id=>`<a class="pill" href="#track/${id}">${trackById(id).title}${icon('arrow')}</a>`).join(''):external(prerequisite,'Memory Systems Lab')}</div></div></section><section class="panel"><h3>Full track scope</h3><p class="muted">Progressive units to develop across future releases.</p><ol class="unit-list">${t.units.map((u,i)=>`<li><span class="unitnum">${String(i+1).padStart(2,'0')}</span>${u}</li>`).join('')}</ol></section></div>`);}
+function readInput(){const s=$('#lab-input').value.trim();let v;if(/^-0x[\da-f]+$/i.test(s))v=-BigInt(s.slice(1));else if(/^[-+]?(\d+|0x[\da-f]+|0b[01]+)$/i.test(s))v=BigInt(s.replace(/^\+/,''));else throw new Error('Input must be a decimal, hexadecimal, or binary integer.');if(v<-(1n<<63n)||v>=(1n<<64n))throw new Error('Input must fit a signed or unsigned 64-bit integer.');return v;}
+function saveDraft(){if(!current||!$('#source'))return;state.drafts[current.id]={source:$('#source').value,input:$('#lab-input').value};save();}
+function markDirty(){stopRun();dirty=true;$('#dirty').classList.add('show');results=null;$('#verification').innerHTML='';updateStatus('Source or input changed. Build to load it.');updateButtons();saveDraft();updateLineNumbers();}
+function updateLineNumbers(){const e=$('#source');if(e)$('#line-numbers').textContent=e.value.split('\n').map((_,i)=>i+1).join('\n');}
+function stopRun(){running=false;runToken++;}
+function updateButtons(){if(!$('#build'))return;$('#run').disabled=dirty||!machine||['halted','fault'].includes(machine.status);$('#step').disabled=dirty||!machine||running||['halted','fault'].includes(machine.status);$('#back').disabled=dirty||!machine?.history.length||running;$('#verify').disabled=running;$('#build').disabled=running;$('#run').innerHTML=icon(running?'pause':'play')+(running?'Pause':'Run');}
+function updateStatus(text=null){const e=$('#machine-status');if(!e)return;const error=machine?.status==='fault',success=machine?.status==='halted';e.className=`status-line ${error?'error':success?'success':''}`;e.innerHTML=`<span class="status-dot"></span><span>${esc(text??machine?.reason??'Build your program to begin.')}</span><span class="stepcount">${machine?.steps??0} instructions</span>`;}
+function build(){stopRun();try{const input=readInput();machine=createFixture(Machine,assemble,current,$('#source').value,input);dirty=false;breakpoints=new Set();watchpoints=new Set();$('#dirty').classList.remove('show');results=null;$('#verification').innerHTML='';saveDraft();renderExecution();}catch(e){machine=null;dirty=true;$('#disassembly-rows').innerHTML=`<tr><td colspan="4"><div class="engine-error">${esc(e.message)}</div></td></tr>`;$('#inspector-body').innerHTML='<p class="inspector-help">Fix the build error to inspect machine state.</p>';updateStatus(e.message);$('#machine-status').classList.add('error');updateButtons();}}
+function renderDisassembly(){const body=$('#disassembly-rows');if(!machine){body.innerHTML='';return;}body.innerHTML=machine.program.instructions.map(r=>`<tr class="${BigInt(r.address)===machine.rip?'current':''}" data-address="${r.address}"><td><button class="bp ${breakpoints.has(r.address)?'on':''}" data-bp="${r.address}" aria-label="${breakpoints.has(r.address)?'Remove':'Set'} breakpoint at line ${r.line}" aria-pressed="${breakpoints.has(r.address)}"><span></span></button></td><td class="address">${hex(r.address,4)}</td><td class="bytes">${r.bytes.map(b=>hex(b,2)).join(' ')}</td><td class="insn">${esc(r.text)}</td></tr>`).join('');$$('[data-bp]').forEach(b=>b.onclick=()=>{const a=+b.dataset.bp;breakpoints.has(a)?breakpoints.delete(a):breakpoints.add(a);renderDisassembly();});}
+function renderRegisters(){const before=machine.history.at(-1)?.before;return `<div class="register-grid">${REG64.map((r,i)=>`<div class="register ${before&&before.regs[i]!==machine.regs[i]?'changed':''}" title="Unsigned: ${machine.regs[i]} · signed: ${signed(machine.regs[i])}"><span>${r}</span><span data-reg="${r}">${hex(machine.regs[i])}</span></div>`).join('')}<div class="register rip"><span>rip</span><span data-reg="rip">${hex(machine.rip)}</span></div></div><div class="flagrow">${Object.entries(machine.flags).map(([k,v])=>`<span class="flag ${v===null?'undefined':v?'on':''}" title="${v===null?'Architecturally undefined after this instruction':v?'Set':'Clear'}" data-flag="${k}">${k} ${v===null?'?':+v}</span>`).join('')}</div><p class="inspector-help">Hexadecimal · changed registers highlighted · hover for signed/unsigned values · ? = undefined flag</p>`;}
+function memoryTable(base,rows=8){const changed=new Set(machine.writes.map(w=>w.address));return `<table class="memory-grid"><thead><tr><th>ADDRESS</th>${Array.from({length:8},(_,i)=>`<th>+${i}</th>`).join('')}<th>ASCII</th></tr></thead><tbody>${Array.from({length:rows},(_,r)=>{const a=base+r*8;return `<tr><td>${hex(a,4)}</td>${Array.from({length:8},(_,i)=>{const b=a+i;let mapped=true;try{machine.range(b,1);}catch{mapped=false;}return `<td class="memory-byte ${changed.has(b)?'changed':''} ${watchpoints.has(b)?'watched':''}">${mapped?hex(machine.memory[b],2):'··'}</td>`;}).join('')}<td class="ascii">${Array.from({length:8},(_,i)=>{let b=machine.memory[a+i];try{machine.range(a+i,1);}catch{b=0;}return b>=32&&b<=126?esc(String.fromCharCode(b)):'.';}).join('')}</td></tr>`;}).join('')}</tbody></table>`;}
+function renderInspector(){
+ const el=$('#inspector-body');if(!machine){el.innerHTML='<p class="inspector-help">Build the program to inspect its state.</p>';return;}
+ if(inspectTab==='registers')el.innerHTML=renderRegisters();
+ if(inspectTab==='memory'){
+  el.innerHTML=`<div class="memory-controls"><label for="memory-address">Address</label><input id="memory-address" value="0x${memoryBase.toString(16)}" spellcheck="false"><button class="btn small" id="memory-go">Inspect</button><button class="btn small ghost" id="watch-toggle">${watchpoints.has(memoryBase)?'Remove watch':'Watch write'}</button><button class="btn small ghost" id="memory-stack">Stack</button></div>${memoryTable(memoryBase)}<p class="inspector-help">64 bytes · little-endian · ·· = unmapped · watch stops after a write to the selected byte.<br>${watchpoints.size?`Watching: <span class="watch-address">${[...watchpoints].map(a=>'0x'+a.toString(16)).join(', ')}</span>`:'No write watchpoints set.'}</p>`;
+  $('#memory-go').onclick=()=>{const s=$('#memory-address').value.trim();if(!/^(0x[\da-f]+|\d+)$/i.test(s)){toast('Enter a hexadecimal or decimal address.');return;}const n=Number(s);if(!Number.isInteger(n)||n<0||n>0xffc0){toast('Inspect an address between 0x0000 and 0xffc0.');return;}memoryBase=n;renderInspector();};
+  $('#memory-address').onkeydown=e=>{if(e.key==='Enter')$('#memory-go').click();};
+  $('#watch-toggle').onclick=()=>{watchpoints.has(memoryBase)?watchpoints.delete(memoryBase):watchpoints.add(memoryBase);renderInspector();};
+  $('#memory-stack').onclick=()=>{memoryBase=Math.min(0x7fc0,Math.max(0x7000,Number(machine.regs[4])&~7));renderInspector();};
+ }
+ if(inspectTab==='stack'){
+  const sp=Number(machine.regs[4]);let rows='';for(let i=0;i<6;i++){const a=sp+i*8;let value;try{value=machine.readMem(a,64);}catch{break;}rows+=`<div class="stack-row"><span class="addr">0x${hex(a,4)} ${i===0?'← RSP':''}</span><span>${hex(value)}</span><small>${value===0xfff0n?'harness return':''}</small></div>`;}
+  el.innerHTML=(rows||'<p class="inspector-help">No readable stack slots above the current RSP.</p>')+`<p class="inspector-help">Stack grows toward lower addresses. CALL/RET event depth: ${machine.calls.length}. This is an event record, not native stack unwinding.</p>`;
+ }
+ if(inspectTab==='history')el.innerHTML=machine.history.length?machine.history.slice(-12).reverse().map(h=>`<div class="trace-row"><span>#${h.before.steps+1}</span><span>0x${hex(h.before.rip,4)}</span><span>${h.instruction}${h.writes.length?` · ${h.writes.length} byte writes`:''}</span></div>`).join('')+'<p class="inspector-help">Most recent first. Back restores one state. Up to 512 steps retained.</p>':'<p class="inspector-help">Step or run to record instruction history.</p>';
+ if(inspectTab==='output')el.innerHTML=`<pre class="output" id="console-output">${esc(machine.output||'No console bytes written.')}</pre><div class="rule"></div><p class="inspector-help">${esc(machine.reason)}<br>RAX = 0x${hex(machine.regs[0])} (${machine.regs[0]} unsigned)<br>The console models write/exit only. No host process or network.</p>`;
+}
+function renderExecution(){renderDisassembly();renderInspector();updateStatus();updateButtons();}
+function singleStep(){if(dirty||!machine)return;machine.step();renderExecution();}
+function run(){
+ if(running){stopRun();if(machine){machine.status='paused';machine.reason='Paused by you';}renderExecution();return;}
+ if(!machine||dirty)return;running=true;const token=++runToken;let total=0;updateButtons();
+ function tick(){if(!running||token!==runToken)return;const n=machine.run({limit:Math.min(200,10000-total),breakpoints,watchpoints,skipCurrent:total===0&&machine.reason==='Address breakpoint'});total+=n;const paused=!machine.reason.startsWith('Instruction budget');
+  if(['halted','fault'].includes(machine.status)||paused||total>=10000){running=false;if(total>=10000&&!['halted','fault'].includes(machine.status))machine.reason='Instruction budget (10000) reached';renderExecution();return;}
+  renderExecution();requestAnimationFrame(tick);
+ }requestAnimationFrame(tick);
+}
+function reading(){const s=current.sections[sectionIndex];$('#reading-position').textContent=`${String(sectionIndex+1).padStart(2,'0')} / ${String(current.sections.length).padStart(2,'0')}`;$('#reading-content').innerHTML=`<div class="section-steps" aria-label="Lesson sections">${current.sections.map((s,i)=>`<button class="${i===sectionIndex?'active':''}" data-section="${i}" aria-label="Section ${i+1}: ${esc(s.title)}" ${i===sectionIndex?'aria-current="step"':''}></button>`).join('')}</div><section class="lesson-section"><h2>${s.title}</h2>${s.p.map(p=>`<p>${p}</p>`).join('')}</section>`;$('#section-prev').disabled=sectionIndex===0;$('#section-next').disabled=sectionIndex===current.sections.length-1;$('#reading-page').textContent=`${sectionIndex+1} of ${current.sections.length}`;$$('[data-section]').forEach(b=>b.onclick=()=>{sectionIndex=+b.dataset.section;reading();});}
+function renderHints(){const box=$('#hint-content');box.innerHTML=`${hints?`<ol>${current.hints.slice(0,hints).map(h=>`<li>${esc(h)}</li>`).join('')}</ol>`:''}${solutionVisible?`<pre class="solution">${esc(current.solution||`Accepted input: ${current.answer}`)}</pre>${current.solution?'<button class="btn small" id="load-solution">Load worked solution</button>':'<button class="btn small" id="load-answer">Use worked input</button>'}`:''}`;$('#hint-next').disabled=hints>=current.hints.length;$('#hint-next').textContent=`Reveal hint ${Math.min(hints+1,current.hints.length)}/${current.hints.length}`;$('#solution-toggle').textContent=solutionVisible?'Hide solution':'Show solution';if($('#load-solution'))$('#load-solution').onclick=()=>{$('#source').value=current.solution;markDirty();build();toast('Worked solution loaded. Step through it to understand the repair.');};if($('#load-answer'))$('#load-answer').onclick=()=>{$('#lab-input').value=current.answer;markDirty();build();};}
+function renderQuiz(){const q=current.quiz,answer=state.quizzes[current.id];$('#quiz').innerHTML=`<div class="eyebrow">CHECK YOUR UNDERSTANDING</div><p>${q.q}</p>${q.options.map((o,i)=>`<button class="quiz-option ${answer===i?(i===q.answer?'correct':'wrong'):''}" data-answer="${i}" aria-pressed="${answer===i}">${esc(o)}</button>`).join('')}${answer!==undefined?`<p class="quiz-feedback" role="status"><strong>${answer===q.answer?'Correct.':'Try again.'}</strong> ${q.why}</p>`:''}`;$$('[data-answer]').forEach(b=>b.onclick=()=>{state.quizzes[current.id]=+b.dataset.answer;save();renderQuiz();});}
+function verify(){try{saveDraft();results=verifyLesson(Machine,assemble,current,$('#source').value,readInput());if(results.ok){state.progress[current.id]={done:true,at:new Date().toISOString(),solutionUsed:solutionVisible||!!state.progress[current.id]?.solutionUsed};save();$('#completion-pill').textContent='Exercise complete';$('#completion-pill').classList.add('done');}$('#verification').innerHTML=`<section class="verify-results" aria-live="polite"><h3 class="${results.ok?'pass':'fail'}">${results.ok?'Contract satisfied':'Keep investigating'} · ${results.results.filter(r=>r.ok).length}/${results.results.length} cases passed</h3>${results.results.map(r=>`<div class="case"><span class="${r.ok?'pass':'fail'}">${r.ok?'PASS':'FAIL'}</span><code>input ${esc(r.input)}</code><span class="explain">${esc(r.reason)}${!r.ok&&r.actual?` · RAX ${r.actual}`:''}</span></div>`).join('')}${results.ok?`<p class="inspector-help">${current.mode==='solve'?'The original validator accepts this input.':'The repaired program satisfies these local test cases.'} Explain why it works, then continue.</p><a class="btn small primary" href="#lab/${lessons[(lessons.indexOf(current)+1)%lessons.length].id}">Next investigation${icon('arrow')}</a>`:''}</section>`;if(results.ok)toast('Exercise verified. Progress saved.');}catch(e){toast(e.message);}}
+function lab(id){
+ current=lessonById(id);if(!current)return notFound();state.lastLab=id;save();const t=trackById(current.track),draft=state.drafts[id];sectionIndex=0;inspectTab='registers';memoryBase=current.id==='saved-return'?0x7fc0:DATA;hints=0;solutionVisible=false;results=null;mobileTab='lesson';
+ shell('curriculum',`${t.title} / Lab`, `<div class="lab-title"><div><a class="eyebrow" href="#track/${t.id}">TRACK ${t.n} / ${t.title}</a><h1>${current.title}</h1><p>${current.subtitle}</p></div><div class="lab-meta"><span class="pill">${current.duration} min</span><span class="pill">${current.difficulty}</span><span class="pill ${done(id)?'done':''}" id="completion-pill">${done(id)?'Exercise complete':'In progress'}</span></div></div>
+ <div class="mobile-lab-tabs" aria-label="Lab view"><button class="btn primary" data-mobile="lesson">${icon('book')}Lesson</button><button class="btn" data-mobile="workbench">${icon('code')}Workbench</button></div>
+ <div class="lab-layout" id="lab-layout" data-mobile="lesson"><div class="lesson-column"><article class="reading"><header class="reading-head">${icon('book')} Investigation notes<span id="reading-position"></span></header><div class="reading-body" id="reading-content"></div><nav class="reading-nav" aria-label="Lesson sections"><button class="btn small ghost" id="section-prev">${icon('left')}Previous</button><span id="reading-page"></span><button class="btn small" id="section-next">Next${icon('arrow')}</button></nav></article>
+ <div class="objective"><div class="eyebrow">${icon('chip')}YOUR EXPERIMENT</div><p>${current.goal}</p></div>
+ <section class="hintbox"><h3>Need another angle?</h3><div class="row spread"><button class="btn small ghost" id="hint-next">Reveal hint 1/3</button><button class="btn small ghost" id="solution-toggle">Show solution</button></div><div id="hint-content"></div></section>
+ <section class="quiz" id="quiz"></section><div class="references">PRIMARY REFERENCES${current.refs.map(k=>external(sources[k].url,sources[k].label,'')).join('')}<a href="#reference">Engine assumptions and supported instructions</a></div></div>
+ <section class="workbench" aria-label="Code and debugger"><div class="workbench-top"><div class="eyebrow"><span class="dot"></span>LIVE WORKBENCH</div><a href="#reference" class="engine-tag">x86-64 teaching engine · subset ↗</a></div>
+ <div class="codebox"><header class="editor-header"><span class="file-tab">${icon('code')}${current.id.replaceAll('-','_')}.s<span class="dirty" id="dirty" aria-label="Unbuilt changes"></span></span><div class="row"><button class="iconbtn" id="reset-source" aria-label="Restore starter code">${icon('reset')}</button><button class="iconbtn" id="download-source" aria-label="Download GNU assembly">${icon('download')}</button></div></header><div class="editor-wrap"><div class="line-numbers" id="line-numbers" aria-hidden="true"></div><textarea id="source" class="editor" aria-label="Assembly source" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off">${esc(draft?.source??current.starter)}</textarea></div><div class="input-row"><label for="lab-input">${current.inputLabel}</label><input id="lab-input" aria-label="Lab input" type="text" spellcheck="false" value="${esc(draft?.input??current.input)}"></div></div>
+ <div class="toolbar"><button class="btn primary" id="build">${icon('build')}Build</button><button class="btn" id="run">${icon('play')}Run</button><button class="btn" id="step">${icon('step')}Step</button><button class="btn" id="back">${icon('back')}Back</button><button class="btn ghost verify" id="verify">${icon('check')}${current.mode==='solve'?'Verify input':'Verify repair'}</button></div>
+ <div class="status-line" id="machine-status" role="status" aria-live="polite"></div>
+ <div class="disassembly"><div class="box-head"><span>ASSEMBLED INSTRUCTIONS</span><span>Click a circle to set a breakpoint</span></div><div class="dis-scroll"><table class="dis-table" aria-label="Assembled instructions and breakpoints"><tbody id="disassembly-rows"></tbody></table></div></div>
+ <div class="inspector"><div class="inspect-tabs" role="tablist" aria-label="Machine state">${['registers','memory','stack','history','output'].map(x=>`<button role="tab" aria-selected="${x==='registers'}" class="inspect-tab ${x==='registers'?'active':''}" data-inspect="${x}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div><div class="inspector-body" id="inspector-body" role="tabpanel" aria-label="Selected machine state"></div></div><div id="verification"></div><p class="inspector-help">Changes and progress stay in this browser. Build clears breakpoints and watches. Run stops after at most 10,000 instructions.</p></section></div>`,true);
+ $('#source').oninput=markDirty;$('#source').onscroll=()=>{$('#line-numbers').scrollTop=$('#source').scrollTop;};$('#source').onkeydown=e=>{if(e.key==='Tab'){e.preventDefault();const t=e.target,a=t.selectionStart,b=t.selectionEnd;t.setRangeText('    ',a,b,'end');markDirty();}if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();build();}};
+ $('#lab-input').oninput=markDirty;$('#build').onclick=build;$('#step').onclick=singleStep;$('#back').onclick=()=>{machine?.rewind();renderExecution();};$('#run').onclick=run;$('#verify').onclick=verify;
+ $('#reset-source').onclick=()=>{if(confirm('Replace this lesson’s saved source and input with the starter?')){$('#source').value=current.starter;$('#lab-input').value=current.input;markDirty();build();}};
+ $('#download-source').onclick=()=>download(`${current.id}.S`,exportGNU($('#source').value));
+ $('#section-prev').onclick=()=>{sectionIndex=Math.max(0,sectionIndex-1);reading();};$('#section-next').onclick=()=>{sectionIndex=Math.min(current.sections.length-1,sectionIndex+1);reading();};
+ $('#hint-next').onclick=()=>{hints=Math.min(hints+1,current.hints.length);renderHints();};$('#solution-toggle').onclick=()=>{solutionVisible=!solutionVisible;renderHints();};
+ $$('[data-mobile]').forEach(b=>b.onclick=()=>{mobileTab=b.dataset.mobile;$('#lab-layout').dataset.mobile=mobileTab;$$('[data-mobile]').forEach(x=>x.classList.toggle('primary',x.dataset.mobile===mobileTab));});
+ $$('[data-inspect]').forEach(b=>b.onclick=()=>{inspectTab=b.dataset.inspect;$$('[data-inspect]').forEach(x=>{x.classList.toggle('active',x.dataset.inspect===inspectTab);x.setAttribute('aria-selected',String(x.dataset.inspect===inspectTab));});renderInspector();});
+ updateLineNumbers();reading();renderHints();renderQuiz();build();
+}
+function progress(){shell('progress','Your progress',`<div class="page-title"><div class="eyebrow">YOUR INVESTIGATIONS</div><h1>Understanding, accumulated.</h1><p>${completed()} of ${lessons.length} runnable exercises verified. Completion records the exercise checks; it is not a certification of mastery.</p><div class="row wrap"><button class="btn primary" id="export-progress">${icon('download')}Export progress & code</button><button class="btn" id="import-progress">${icon('save')}Import progress</button><input type="file" id="progress-file" accept="application/json,.json" hidden></div></div><div class="progress-grid">${tracks.filter(t=>t.labs.length).map(t=>{const n=t.labs.filter(done).length;return `<a class="progress-item" href="#track/${t.id}"><h3>${t.title}</h3><progress max="${t.labs.length}" value="${n}" aria-label="${esc(t.title)} progress"></progress><div class="row spread"><span>${n} / ${t.labs.length} complete</span>${icon('arrow')}</div></a>`;}).join('')}</div><div class="section-head"><h2>Exercise ledger</h2></div><div class="lesson-list">${lessons.map((l,i)=>lessonLink(l,i)).join('')}</div><div class="notice"><strong>Portable by design.</strong> Export includes your source edits, inputs, quiz answers, and completion records. Import replaces this browser’s teard0wn data after confirmation. It never executes imported source automatically.</div>`);
+ $('#export-progress').onclick=()=>download('teard0wn-progress.json',JSON.stringify(state,null,2),'application/json');$('#import-progress').onclick=()=>$('#progress-file').click();$('#progress-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>2_000_000)throw new Error('Progress file is too large (2 MB maximum).');const incoming=validateState(JSON.parse(await f.text()));if(!confirm('Replace this browser’s teard0wn progress and saved code with this file?'))return;state=incoming;save();document.documentElement.dataset.theme=state.theme;progress();toast('Progress imported. Source is loaded only when you open a lab.');}catch(e){toast(`Import failed: ${e.message}`);}};
+}
+function reference(){shell('reference','Engine reference',`<div class="page-title"><div class="eyebrow">KNOW YOUR INSTRUMENT</div><h1>What this machine does.</h1><p>Real x86-64 instruction encodings, executed by an explicitly bounded teaching engine. Understand the model before drawing conclusions from it.</p></div><article class="prose"><h2>Execution model</h2><p>The assembler emits machine-code bytes, resolves labels, and maps instructions to source lines. The executor decodes bytes at RIP; it does not merely animate source text. Registers use BigInt for exact 64-bit integers. Execution is single-threaded, deterministic, and limited by an instruction budget.</p><p>This is not a complete x86 CPU, Linux VM, C/C++ compiler, or native debugger. It models the subset below, a small address map, and two successful syscall cases. It does not measure your processor, implement timing, or run operating-system/kernel experiments.</p><h2>Supported instruction families</h2><table><thead><tr><th>Family</th><th>Instructions</th><th>Boundaries</th></tr></thead><tbody><tr><td>Data</td><td>MOV, LEA</td><td>Register/immediate and register/memory forms. No memory-to-memory MOV.</td></tr><tr><td>Arithmetic</td><td>ADD, SUB, CMP, INC, DEC, NEG, IMUL</td><td>IMUL is the two-operand 16/32/64-bit form. No division or carry-chain instructions.</td></tr><tr><td>Logic</td><td>AND, OR, XOR, TEST, NOT</td><td>8/16/32/64-bit widths.</td></tr><tr><td>Shifts</td><td>SHL, SHR, SAR</td><td>Immediate counts. Undefined flags display ?.</td></tr><tr><td>Control</td><td>JMP, Jcc, CALL, RET, NOP, INT3</td><td>Direct near label branches. No indirect branches or privileged instructions.</td></tr><tr><td>Stack</td><td>PUSH, POP</td><td>64-bit registers; PUSH also accepts a signed 32-bit immediate.</td></tr><tr><td>Boundary</td><td>SYSCALL</td><td>Modeled Linux x86-64 write(1) to stdout/stderr and exit(60), only.</td></tr></tbody></table><h2>Registers, flags, and addresses</h2><ul><li>RAX–R15 and their 32/16/low-8-bit views. Writes to a 32-bit register zero the upper half. AH/BH/CH/DH are not supported.</li><li>CF, PF, AF, ZF, SF, OF. Undefined flags are represented explicitly; using an undefined condition causes a teaching-engine fault.</li><li>Memory expressions: base + index × 1/2/4/8 + signed 32-bit displacement. Address registers are 64-bit. No RIP-relative, segment, or address-size-override forms.</li><li>Mapped code is read-only/executable. Data and stack are writable/non-executable. These are fixture permissions, not a full page-table implementation.</li></ul><table><thead><tr><th>Region</th><th>Addresses</th><th>Behavior</th></tr></thead><tbody><tr><td>Code</td><td>0x1000 to the assembled code end (below 0x2000)</td><td>RX, at most 4 KiB</td></tr><tr><td>Data</td><td>0x2000–0x3fff</td><td>RW, zero-initialized outside declared data</td></tr><tr><td>Stack</td><td>0x7000–0x7fff</td><td>RW; initial RSP 0x7ff8</td></tr><tr><td>Harness return</td><td>0xfff0</td><td>Synthetic sentinel; RET to it ends the function</td></tr></tbody></table><h2>Debugger behavior</h2><p>Address breakpoints stop before an instruction. Write watchpoints stop after an instruction touches the selected byte. Back restores registers, flags, memory writes, output, and call-event state for the most recent 512 steps. Build resets the machine and clears breakpoints/watches. Run yields to the browser between instruction batches and stops after 10,000 instructions.</p><h2>Source and input</h2><p>Use Intel syntax with destination first. Labels and register names are case-insensitive. Semicolon and # introduce comments outside quoted literals. The .text/.data sections and .byte/.quad/.zero/.ascii/.asciz data directives are supported. Memory sizes are byte, word, dword, or qword ptr. Source is limited to 64,000 characters. Input accepts decimal/hex/binary integers fitting 64 bits.</p><h2>Honest limits</h2><p>Source-to-machine mappings describe this assembler, not compiler optimization or DWARF. The call list records CALL/RET events; it cannot reconstruct an arbitrary corrupted native call stack. Modeled WRITE completes in full and does not reproduce real short writes, signals, errno, or file descriptors. Flags and instruction behaviors are checked against native x86-64 in the repository tests, but that is evidence for the tested subset, not full CPU conformance.</p><p>There is no native C compiler in the browser release. The repository includes separate native C investigations and GNU assembly export. Future kernel, TrustZone, fuzzing, and PMU laboratories need their own validated runtime. Their syllabus is retained in the curriculum.</p><h2>References and project files</h2><p>${external(sources.intel.url,sources.intel.label)}<br>${external(sources.abi.url,sources.abi.label)}<br>${external(sources.gas.url,sources.gas.label)}</p><p><a class="textlink" href="./docs/ENGINE.md">Detailed engine contract</a> · <a class="textlink" href="./docs/CURRICULUM.md">Coverage ledger</a> · <a class="textlink" href="./README.md">Project README</a></p></article>`);}
+function notFound(){shell('home','Not found','<div class="empty"><h1>This page does not exist.</h1><p>The requested lesson or track may have moved.</p><a class="btn primary" href="#curriculum">Open curriculum</a></div>');}
+function route(){const path=location.hash.slice(1)||'home';if(path==='main')return;saveDraft();stopRun();current=null;machine=null;document.title='teard0wn lab — '+(path.startsWith('lab/')?(lessonById(path.slice(4))?.title||'Lab'):'Understand every layer');if(path==='home')home();else if(path==='curriculum')curriculum();else if(path==='progress')progress();else if(path==='reference')reference();else if(path.startsWith('track/'))track(path.slice(6));else if(path.startsWith('lab/'))lab(path.slice(4));else notFound();window.scrollTo(0,0);}
+window.addEventListener('hashchange',route);window.addEventListener('beforeunload',saveDraft);window.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#sidebar')?.classList.remove('open');$('#menu')?.setAttribute('aria-expanded','false');if(running){stopRun();machine.reason='Paused by you';renderExecution();}}});
+$('.skip').onclick=e=>{e.preventDefault();const main=$('#main');main.tabIndex=-1;main.focus();main.scrollIntoView();};
+route();
+</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div id="app"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <noscript><main><h1>teard0wn lab</h1><p>The interactive workbench requires JavaScript. All execution stays in your browser.</p></main></noscript>
+</body>
+</html>

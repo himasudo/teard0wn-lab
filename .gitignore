@@ -1,0 +1,8 @@
+node_modules/
+test-results/
+__pycache__/
+*.o
+*.bin
+*.core
+.DS_Store
+.teard0wn-publish.json

@@ -1,0 +1,15 @@
+{
+  "name": "teard0wn-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "An original, inspectable systems and security laboratory.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "serve": "python3 -m http.server 8000 --bind 127.0.0.1",
+    "test:native": "python3 tests/native_check.py",
+    "test:browser": "node tests/browser.cjs"
+  },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

@@ -1,0 +1,44 @@
+name: Verify lab
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Engine and lesson contracts
+        run: npm test
+      - name: Native x86-64 differential comparison
+        run: python3 tests/native_check.py
+      - name: Check portable build is current
+        run: |
+          python3 build.py
+          git diff --exit-code -- dist/teard0wn-lab.html
+      - name: Install browser test tooling
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Rendered desktop, tablet, and phone checks
+        run: npm run test:browser
+      - name: Retain browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evidence
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
