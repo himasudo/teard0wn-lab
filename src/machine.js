@@ -223,7 +223,9 @@ export class Machine {
       if(low===4){const sib=take();scale=1<<(sib>>6);const ix=(sib>>3)&7;if(ix!==4||(rex&2))index=ix|((rex&2)?8:0);base=(sib&7)|((rex&1)?8:0);if(mode===0&&(sib&7)===5){base=null;disp=imm(4,true);}}
       else if(mode===0&&low===5){base=null;disp=imm(4,true);ripRelative=true;}
       if(mode===1)disp=imm(1,true);if(mode===2)disp=imm(4,true);
-      if(ripRelative)fail('RIP-relative encodings are not supported in this release.');
+      // RIP-relative: the base is the address of the NEXT instruction, which is
+      // only known once any trailing immediate has been read. Defer resolution.
+      if(ripRelative)return {field,operand:{kind:'mem',width,ripRelative:true,disp}};
       const address=unsigned((base===null?0n:this.regs[base])+(index===null?0n:this.regs[index]*BigInt(scale))+disp);
       return {field,operand:{kind:'mem',width,address}};
     };
@@ -272,7 +274,9 @@ export class Machine {
       if(!group)fail(`Unsupported opcode 0x${op.toString(16)} at 0x${Number(this.rip).toString(16)}.`);
       name=group;const direction=(op-binBase[group])>>1,w=op&1?wide:8,x=rm(w);args=direction?[reg(x.field,w),x.operand]:[x.operand,reg(x.field,w)];
     }
-    return {name,args,next:BigInt(p),address:this.rip};
+    const next=BigInt(p);
+    for(const a of args)if(a&&a.kind==='mem'&&a.ripRelative){a.address=unsigned(next+a.disp);delete a.ripRelative;delete a.disp;}
+    return {name,args,next,address:this.rip};
   }
   zsp(result,width){this.flags.ZF=result===0n;this.flags.SF=!!(result&(1n<<BigInt(width-1)));let parity=0;for(let i=0;i<8;i++)parity^=Number((result>>BigInt(i))&1n);this.flags.PF=parity===0;}
   arithmetic(op,a,b,w){

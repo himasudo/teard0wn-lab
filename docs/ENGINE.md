@@ -14,9 +14,13 @@ Address form: 64-bit base + index × 1/2/4/8 + signed 32-bit displacement. RSP c
 
 The decoder understands a larger set than the hand assembler emits, so it can execute real `gcc` output byte-for-byte. Beyond the families above it decodes: `movzx`/`movsx`/`movsxd`, one-operand `mul`/`imul`/`div`/`idiv` with `cdq`/`cqo`/`cdqe`/`cwde`, `cmov`cc, `setcc`, `leave`, `xchg`, shifts by `CL`, sign-extended `imm8` arithmetic (`0x83`), short `rel8` `jmp`/`jcc`, indirect `call`/`jmp`/`push` (`FF /2,/4,/6`), `endbr64`/`endbr32` and multi-byte `nop` (as no-ops), and the legacy/REX prefixes around them.
 
-A differential test (`tests/compiled_check.mjs`) compiles a set of C functions, runs them natively, then executes the identical bytes in this engine and compares return values across many inputs. At `-O0` — the readable teaching target — real functions covering recursion, division/modulo, `switch`, local arrays, variable shifts, and width conversion all match the native CPU. `-O2` matches except where the compiler vectorizes with SSE.
+RIP-relative operands are decoded (resolved against the next instruction's
+address, after any trailing immediate), so a read-only `.text`+`.rodata` image
+runs: `const` globals, string literals, and `-O2` jump tables all work.
 
-Current boundaries for running compiled code: no SSE/AVX/x87, and RIP-relative operands are not yet decoded, so functions that reference globals, string literals, or jump tables in `.rodata` do not run yet. These are the next decoder items before arbitrary compiled lessons.
+A differential test (`tests/compiled_check.mjs`) compiles a set of C functions, runs them natively, then executes the identical bytes in this engine and compares return values across many inputs. At `-O0` — the readable teaching target — real functions covering recursion, division/modulo, `switch`, local arrays, variable shifts, width conversion, static tables, and string indexing all match the native CPU. `-O2` matches except where the compiler vectorizes with SSE.
+
+Current boundaries for running compiled code: no SSE/AVX/x87, and writable `.data`/`.bss` is not loaded yet, so functions that write to mutable globals do not run. These are the next items before arbitrary compiled lessons.
 
 ## Memory
 

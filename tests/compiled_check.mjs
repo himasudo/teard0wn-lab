@@ -34,6 +34,10 @@ static int callee_add(int a,int b){ return a+b; }
 int caller(int x){ return callee_add(x, x*2); }
 long smul(int a,int b){ return (long)a*(long)b; }
 int cmp_u(unsigned a,unsigned b){ return a<b; }
+static const int T8[8]={2,3,5,7,11,13,17,19};
+int table_lookup(int i){ if((unsigned)i>=8) return -1; return T8[i]; }
+int sw8(int x){ switch(x){case 0:return 100;case 1:return 111;case 2:return 122;case 3:return 133;case 4:return 144;case 5:return 155;case 6:return 166;case 7:return 177;default:return -1;} }
+int pick(int i){ static const char s[]="teardown"; return (i>=0&&i<8)?(unsigned char)s[i]:0; }
 `;
 const DRIVER = `
 #include <stdio.h>
@@ -61,6 +65,9 @@ int main(int c,char**v){
   else if(!strcmp(f,"caller")) printf("%08x\\n",(uint32_t)caller(A));
   else if(!strcmp(f,"smul")) printf("%016llx\\n",(unsigned long long)(uint64_t)smul(A,B));
   else if(!strcmp(f,"cmp_u")) printf("%08x\\n",(uint32_t)cmp_u((unsigned)A,(unsigned)B));
+  else if(!strcmp(f,"table_lookup")) printf("%08x\\n",(uint32_t)table_lookup(A));
+  else if(!strcmp(f,"sw8")) printf("%08x\\n",(uint32_t)sw8(A));
+  else if(!strcmp(f,"pick")) printf("%08x\\n",(uint32_t)pick(A));
   else return 2;
   return 0;
 }
@@ -84,6 +91,9 @@ const PLAN = {
   caller:{ret:32,cases:[0,1,5,-3,1000].map(x=>[x])},
   smul:{ret:64,cases:[[3,7],[-3,7],[65536,65536],[-100000,100000]]},
   cmp_u:{ret:32,cases:[[1,2],[2,1],[0,0],[4294967295,0],[0,4294967295]]},
+  table_lookup:{ret:32,cases:[0,1,2,7,8,-1].map(x=>[x])},
+  sw8:{ret:32,cases:[0,1,4,7,8,-1].map(x=>[x])},
+  pick:{ret:32,cases:[0,1,7,8,-1].map(x=>[x])},
 };
 const ARG=['rdi','rsi','rdx','rcx'];
 
@@ -104,7 +114,9 @@ function main(){
       sh('gcc',[`-O${OPT}`,...FLAGS,'-c',join(dir,'fns.c'),'-o',join(dir,`fns${OPT}.o`)]);
       sh('gcc',[`-O${OPT}`,...FLAGS,join(dir,'driver.c'),'-o',join(dir,`driver${OPT}`)],{cwd:dir});
       sh('ld',[join(dir,`fns${OPT}.o`),'-Ttext=0x1000','-e','add2','-o',join(dir,`fns${OPT}.elf`)]);
-      sh('objcopy',['-O','binary','-j','.text',join(dir,`fns${OPT}.elf`),join(dir,`text${OPT}.bin`)]);
+      // .text + .rodata as one image at base 0x1000, so RIP-relative references
+      // to constants, strings, and jump tables resolve against the loaded bytes.
+      sh('objcopy',['-O','binary','-j','.text','-j','.rodata',join(dir,`fns${OPT}.elf`),join(dir,`text${OPT}.bin`)]);
       const text=new Uint8Array(readFileSync(join(dir,`text${OPT}.bin`)));
       const syms={};
       for(const line of sh('nm',['-n',join(dir,`fns${OPT}.elf`)]).trim().split('\n')){
