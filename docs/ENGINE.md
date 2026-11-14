@@ -49,6 +49,10 @@ It reports the per-instruction hit level, TLB outcome, and prediction, plus runn
 
 `src/fuzzer.js` runs a compiled target with a 32-bit input and takes the set of instruction addresses the run executed as its coverage. It keeps any input that reaches a new address and mutates from that corpus, so it works through byte-compared gates one at a time; a crash is an engine fault. On the byte-gated target this finds the single crashing input in the low thousands of executions, against a 2^32 space. `tests/fuzzer.test.js` checks that the gated input is found and that the known crash faults while a benign input does not.
 
+## Memory ordering (x86-TSO)
+
+`src/tso.js` is an operational model of x86-TSO, separate from the single-threaded engine. Each thread's stores enter a private FIFO store buffer and reach memory only on drain; the thread's own loads read its buffer first; MFENCE blocks until the buffer is empty. `explore()` enumerates every interleaving and drain order and returns the set of reachable final register tuples, so the Concurrency lab can mark an outcome allowed exactly when it is reachable. This reproduces the classic results — SB permits (0,0), an MFENCE between removes it, MP forbids reading a set flag with stale data, LB forbids both loads returning 1 — all checked in `tests/tso.test.js`.
+
 ## Flags
 
 CF, PF, AF, ZF, SF, and OF are represented. Undefined results are null, rendered as `?`. A conditional branch depending on an undefined flag faults explicitly. This conservative behavior is a teaching choice; real hardware still has a bit value, but software may not rely on it when the architecture leaves it undefined.

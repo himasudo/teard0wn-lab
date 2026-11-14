@@ -92,10 +92,13 @@ real CPU at three layers:
   fault as a crash. The Fuzzing section shows a live coverage map; the gated
   target is cracked in the low thousands of executions where blind search could
   not. Targets build through the same pipeline (`lessons/fuzz/`).
+- **Memory ordering.** `src/tso.js` is an operational x86-TSO model (per-thread
+  FIFO store buffers, drain-to-memory, store-buffer-forwarding loads, MFENCE).
+  The Concurrency section runs the classic litmus tests and marks each outcome
+  allowed iff the model can reach it.
 
 ## Roadmap
 
-1. **Concurrency.** Two-core + store-buffer mode for TSO/coherence litmus tests.
-2. **Toolchain track.** An ELF/linking/PLT-GOT walkthrough.
-3. **Writable data / broader compiled support.** Load `.data`/`.bss` so mutable
+1. **Toolchain track.** An ELF/linking/PLT-GOT walkthrough.
+2. **Writable data / broader compiled support.** Load `.data`/`.bss` so mutable
    globals run; decode SSE for vectorized `-O2` output.
