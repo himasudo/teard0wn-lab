@@ -84,3 +84,30 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .register.xmm .xmm-lanes{font-family:var(--mono);font-size:11px;display:flex;gap:4px;margin-left:8px}
 .register.xmm .xmm-lanes i{font-style:normal;padding:1px 4px;background:rgba(127,127,127,.14);border-radius:3px;letter-spacing:.3px}
 .register.xmm .xmm-f{color:var(--accent);font-size:11px;margin-left:auto;font-family:var(--mono)}
+
+/* Control-flow graph view */
+.cfg-picker{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.cfg-pick{font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted);text-decoration:none;white-space:nowrap}
+.cfg-pick:hover{color:var(--text);border-color:var(--accent)}
+.cfg-pick.active{background:var(--accent);color:var(--accentink);border-color:var(--accent)}
+.cfg-stats{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 16px;color:var(--muted);font-size:13px}
+.cfg-stats strong{color:var(--text)}
+.cfg-wrap{position:relative;margin:8px 0}
+.cfg-edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.cfg-edges .cfg-path{fill:none;stroke:var(--muted);stroke-width:1.6}
+.cfg-edges .cfg-path.taken{stroke:var(--accent)}
+.cfg-edges .cfg-path.back{stroke:var(--blue);stroke-dasharray:4 3}
+.cfg-edges marker path{fill:var(--muted)}
+.cfg-col{margin-left:34px;display:flex;flex-direction:column;gap:18px}
+.cfg-block{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);overflow:hidden;max-width:640px}
+.cfg-block.exit{border-color:var(--accent)}
+.cfg-bhead{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.cfg-bid{font-weight:600;color:var(--text)}
+.cfg-tag{margin-left:auto;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--accent);color:var(--accentink)}
+.cfg-bbody{padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.cfg-ins{font-size:12px;color:var(--text);white-space:pre;overflow-x:auto}
+.cfg-outs{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-top:1px dashed var(--border)}
+.cfg-succ{font-size:11px;padding:2px 8px;border-radius:999px;text-decoration:none;border:1px solid var(--border);color:var(--muted)}
+.cfg-succ.taken{border-color:var(--accent);color:var(--accent)}
+.cfg-succ.back{border-color:var(--blue);color:var(--blue)}
+.cfg-succ:hover{background:var(--surface2)}

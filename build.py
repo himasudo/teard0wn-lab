@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 def build():
     modules=[]
     logo='data:image/svg+xml;base64,'+base64.b64encode((ROOT/'mark.svg').read_bytes()).decode()
-    for name in ('machine.js','curriculum.js','lessons.js','compiled.js','micro.js','fuzz.js','fuzzer.js','tso.js','elfdata.js','app.js'):
+    for name in ('machine.js','curriculum.js','lessons.js','compiled.js','micro.js','fuzz.js','fuzzer.js','tso.js','elfdata.js','cfg.js','app.js'):
         text=(ROOT/'src'/name).read_text()
         text=re.sub(r'^import .*?;\n','',text,flags=re.MULTILINE)
         text=re.sub(r'^export (?=(const|class|function)\b)','',text,flags=re.MULTILINE)
