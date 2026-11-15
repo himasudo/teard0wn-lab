@@ -208,3 +208,11 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .asan-v{font-size:11px;padding:2px 9px;border-radius:999px;font-family:var(--mono);white-space:nowrap}
 .asan-v.ok{background:rgba(63,160,106,.16);color:#3fa06a}
 .asan-v.bad{background:var(--redbg);color:var(--red)}
+
+/* Symbolic-execution view */
+.sym-out{display:flex;flex-direction:column;gap:12px;margin:14px 0}
+.sym-row{display:flex;flex-direction:column;gap:6px}
+.sym-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.sym-asm{margin:0;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:12px;color:var(--text);overflow-x:auto}
+.sym-expr{display:block;padding:12px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--surface);font-size:13px;color:var(--text);overflow-x:auto}
+.sym-sol{display:block;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);font-size:13px;color:var(--accent);overflow-x:auto}

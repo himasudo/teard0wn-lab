@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101414">
   <meta name="description" content="Take systems apart. An original systems and security laboratory with lessons, editable assembly, and an inspectable x86-64 teaching engine.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-DH+tpga7Dw8H4Bla4uH6SmfBW8EQFFw6yZ/6X2sv+CM='; style-src 'sha256-HCIvqDkzlV0NNLqV48Pl3PCBfebhwbTsG4OTx2I4t7s='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-G2WYpm9A2Ufa/TBRYI7e2Vs5l4/YQ221DMqm0CwNYaU='; style-src 'sha256-thUBi+sIvDNBaKvc6+WjqaOUu1k9jXpPHyMYWryq9HA='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>teard0wn lab — Understand every layer</title>
   <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTIiIGZpbGw9IiNkNGY3NmIiLz48cGF0aCBkPSJNMTYgMTMgNyAyNGw5IDExTTMyIDEzbDkgMTEtOSAxMU0yNyAxMWwtNiAyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTUxYjEzIiBzdHJva2Utd2lkdGg9IjMuMyIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPgo=" type="image/svg+xml">
   <style>@font-face{font-family:LabSans;src:local('Inter'),local('Arial');font-display:swap}
@@ -218,6 +218,14 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .asan-v{font-size:11px;padding:2px 9px;border-radius:999px;font-family:var(--mono);white-space:nowrap}
 .asan-v.ok{background:rgba(63,160,106,.16);color:#3fa06a}
 .asan-v.bad{background:var(--redbg);color:var(--red)}
+
+/* Symbolic-execution view */
+.sym-out{display:flex;flex-direction:column;gap:12px;margin:14px 0}
+.sym-row{display:flex;flex-direction:column;gap:6px}
+.sym-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.sym-asm{margin:0;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:12px;color:var(--text);overflow-x:auto}
+.sym-expr{display:block;padding:12px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--surface);font-size:13px;color:var(--text);overflow-x:auto}
+.sym-sol{display:block;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);font-size:13px;color:var(--accent);overflow-x:auto}
 </style>
   <script type="module">// machine.js
 // teard0wn x86-64 teaching engine. Encodes and decodes real instruction bytes.
@@ -2224,12 +2232,95 @@ function checkAccess(shadow, off, size) {
   return {ok: kind === 'ok', kind, touched};
 }
 
+// symbolic.js
+// Symbolic execution — automatically solving the crackmes.
+//
+// Treat the input as a symbolic variable x and interpret a straight-line
+// validator over it, building an expression tree for the accumulator instead of
+// a concrete value. At the accept comparison the expression and the target form
+// a path constraint; solving it over the input domain recovers the key the
+// crackme accepts — the same key you would find by inverting the chain by hand,
+// found by a tool instead.
+
+const M32 = (1n << 32n) - 1n;
+
+// Build the symbolic expression of the accumulator at the accept comparison.
+function symbolicConstraint(program, inputReg = 7) {
+  const m = new Machine(program);
+  const end = CODE + program.code.length;
+  const regs = {[inputReg]: {op: 'x'}};
+  const val = o => o.kind === 'imm' ? {op: 'k', v: Number(BigInt(o.value) & M32)}
+    : (regs[o.id] ?? {op: 'k', v: 0});
+  let cmp = null, constraint = null, addr = CODE;
+  while (addr < end) {
+    m.rip = BigInt(addr);
+    let d; try { d = m.decode(); } catch (e) { break; }
+    const [dst, src] = d.args || [];
+    const w = (op) => { if (dst?.kind === 'reg') regs[dst.id] = {op, a: val(dst), b: val(src)}; };
+    switch (d.name) {
+      case 'mov': if (dst?.kind === 'reg') regs[dst.id] = val(src); break;
+      case 'and': w('&'); break;
+      case 'add': w('+'); break;
+      case 'sub': w('-'); break;
+      case 'shr': w('>>'); break;
+      case 'shl': w('<<'); break;
+      case 'imul': w('*'); break;
+      case 'xor':
+        if (dst?.kind === 'reg') regs[dst.id] = (src.kind === 'reg' && src.id === dst.id) ? {op: 'k', v: 0} : {op: '^', a: val(dst), b: val(src)};
+        break;
+      case 'cmp': cmp = {a: val(dst), b: val(src)}; break;
+      case 'jcc': if (cmp && !constraint) constraint = cmp; break;  // accept path = equality of the guard
+      case 'ret': addr = end; continue;
+    }
+    if (addr >= end) break;
+    addr = Number(d.next);
+  }
+  return constraint;
+}
+
+function evalExpr(e, x) {
+  switch (e.op) {
+    case 'x': return x & M32;
+    case 'k': return BigInt(e.v) & M32;
+    case '&': return (evalExpr(e.a, x) & evalExpr(e.b, x)) & M32;
+    case '^': return (evalExpr(e.a, x) ^ evalExpr(e.b, x)) & M32;
+    case '+': return (evalExpr(e.a, x) + evalExpr(e.b, x)) & M32;
+    case '-': return (evalExpr(e.a, x) - evalExpr(e.b, x)) & M32;
+    case '>>': return (evalExpr(e.a, x) >> evalExpr(e.b, x)) & M32;
+    case '<<': return (evalExpr(e.a, x) << evalExpr(e.b, x)) & M32;
+    case '*': return (evalExpr(e.a, x) * evalExpr(e.b, x)) & M32;
+  }
+  return 0n;
+}
+
+function exprToString(e) {
+  switch (e.op) {
+    case 'x': return 'x';
+    case 'k': return '0x' + (e.v >>> 0).toString(16);
+    default: return '(' + exprToString(e.a) + ' ' + e.op + ' ' + exprToString(e.b) + ')';
+  }
+}
+
+// Solve the constraint over an input domain of the given bit width.
+function solve(program, inputBits = 8, inputReg = 7) {
+  const c = symbolicConstraint(program, inputReg);
+  if (!c) return {constraint: null, solutions: []};
+  const solutions = [];
+  for (let x = 0; x < (1 << inputBits); x++) {
+    if (evalExpr(c.a, BigInt(x)) === evalExpr(c.b, BigInt(x))) {
+      solutions.push(x);
+      if (solutions.length >= 6) break;
+    }
+  }
+  return {constraint: c, expr: exprToString(c.a), target: exprToString(c.b), solutions};
+}
+
 // app.js
 
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',book:'M3 4h7l2 2 2-2h7v15h-7l-2 2-2-2H3z M12 6v15',chart:'M4 20V10 M10 20V4 M16 20v-7 M22 20H2',code:'m8 5-6 7 6 7 M16 5l6 7-6 7 M14 3l-4 18',arrow:'M4 12h15 M14 6l6 6-6 6',external:'M14 3h7v7 M21 3l-9 9 M10 4H4v16h16v-6',sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M5 19l1-1 M18 6l1-1',menu:'M3 6h18 M3 12h18 M3 18h18',close:'m5 5 14 14 M19 5 5 19',play:'m8 4 12 8-12 8z',step:'m5 5 10 7-10 7z M19 5v14',back:'M8 4v16 M19 5 9 12l10 7z',build:'m14 3 7 7-4 4-7-7z M12 12 3 21 M3 17l4 4',check:'m4 12 5 5L20 6',reset:'M4 10a8 8 0 1 1 1 8 M4 3v7h7',over:'M4 16c0-5 4-8 8-8s8 3 8 8 M17 11l4 1-1 4',finish:'M12 20V6 M6 12l6-6 6 6 M4 4h16',download:'M12 3v12 M7 10l5 5 5-5 M4 17v4h16v-4',github:'M9 19c-5 1-5-2-7-2 M16 22v-4a4 4 0 0 0-1-3c4 0 6-2 6-6a5 5 0 0 0-1-3 5 5 0 0 0 0-4s-2 0-4 2a13 13 0 0 0-7 0C7 2 5 2 5 2a5 5 0 0 0 0 4 5 5 0 0 0-1 3c0 4 2 6 6 6a4 4 0 0 0-1 3v4',chip:'M6 6h12v12H6z M9 9h6v6H9z M9 2v4 M15 2v4 M9 18v4 M15 18v4 M2 9h4 M2 15h4 M18 9h4 M18 15h4',left:'M20 12H4 M10 6l-6 6 6 6',pause:'M8 4v16 M16 4v16',save:'M5 3h12l4 4v14H3V3z M7 3v6h10V3 M7 21v-8h10v8',target:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10 M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2',threads:'M7 4v16 M17 4v16 M7 9l10 6 M17 9l-10 6',layers:'M12 2 2 7l10 5 10-5z M2 12l10 5 10-5 M2 17l10 5 10-5',flow:'M5 3h6v5H5z M13 16h6v5h-6z M8 8v5 M8 13h8v3 M16 13v3',diff:'M6 3v14 M6 7h8 M11 4l3 3-3 3 M18 21V7 M18 17h-8 M13 14l-3 3 3 3',split:'M12 3v18 M7 8 3 12l4 4 M17 8l4 4-4 4',struct:'M3 4h18v4H3z M3 10h18v4H3z M3 16h18v4H3z',shield:'M12 2 4 6v6c0 5 8 9 8 9s8-4 8-9V6z',scan:'M3 7V3h4 M17 3h4v4 M21 17v4h-4 M7 21H3v-4 M3 12h18'};
+const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',book:'M3 4h7l2 2 2-2h7v15h-7l-2 2-2-2H3z M12 6v15',chart:'M4 20V10 M10 20V4 M16 20v-7 M22 20H2',code:'m8 5-6 7 6 7 M16 5l6 7-6 7 M14 3l-4 18',arrow:'M4 12h15 M14 6l6 6-6 6',external:'M14 3h7v7 M21 3l-9 9 M10 4H4v16h16v-6',sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M5 19l1-1 M18 6l1-1',menu:'M3 6h18 M3 12h18 M3 18h18',close:'m5 5 14 14 M19 5 5 19',play:'m8 4 12 8-12 8z',step:'m5 5 10 7-10 7z M19 5v14',back:'M8 4v16 M19 5 9 12l10 7z',build:'m14 3 7 7-4 4-7-7z M12 12 3 21 M3 17l4 4',check:'m4 12 5 5L20 6',reset:'M4 10a8 8 0 1 1 1 8 M4 3v7h7',over:'M4 16c0-5 4-8 8-8s8 3 8 8 M17 11l4 1-1 4',finish:'M12 20V6 M6 12l6-6 6 6 M4 4h16',download:'M12 3v12 M7 10l5 5 5-5 M4 17v4h16v-4',github:'M9 19c-5 1-5-2-7-2 M16 22v-4a4 4 0 0 0-1-3c4 0 6-2 6-6a5 5 0 0 0-1-3 5 5 0 0 0 0-4s-2 0-4 2a13 13 0 0 0-7 0C7 2 5 2 5 2a5 5 0 0 0 0 4 5 5 0 0 0-1 3c0 4 2 6 6 6a4 4 0 0 0-1 3v4',chip:'M6 6h12v12H6z M9 9h6v6H9z M9 2v4 M15 2v4 M9 18v4 M15 18v4 M2 9h4 M2 15h4 M18 9h4 M18 15h4',left:'M20 12H4 M10 6l-6 6 6 6',pause:'M8 4v16 M16 4v16',save:'M5 3h12l4 4v14H3V3z M7 3v6h10V3 M7 21v-8h10v8',target:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10 M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2',threads:'M7 4v16 M17 4v16 M7 9l10 6 M17 9l-10 6',layers:'M12 2 2 7l10 5 10-5z M2 12l10 5 10-5 M2 17l10 5 10-5',flow:'M5 3h6v5H5z M13 16h6v5h-6z M8 8v5 M8 13h8v3 M16 13v3',diff:'M6 3v14 M6 7h8 M11 4l3 3-3 3 M18 21V7 M18 17h-8 M13 14l-3 3 3 3',split:'M12 3v18 M7 8 3 12l4 4 M17 8l4 4-4 4',struct:'M3 4h18v4H3z M3 10h18v4H3z M3 16h18v4H3z',shield:'M12 2 4 6v6c0 5 8 9 8 9s8-4 8-9V6z',scan:'M3 7V3h4 M17 3h4v4 M21 17v4h-4 M7 21H3v-4 M3 12h18',sigma:'M18 4H6l6 8-6 8h12'};
 const icon=n=>`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[n]||icons.code}"/></svg>`;
 const KEY='teard0wn-lab:v1';
 let storageOK=true,state={version:1,theme:'dark',progress:{},drafts:{},quizzes:{},lastLab:null};
@@ -2258,7 +2349,7 @@ function shell(active,crumb,body,lab=false){
  <button class="mobile-close iconbtn" id="close-menu" aria-label="Close navigation">${icon('close')}</button>
  <a class="brand" href="#home" aria-label="teard0wn lab home"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTIiIGZpbGw9IiNkNGY3NmIiLz48cGF0aCBkPSJNMTYgMTMgNyAyNGw5IDExTTMyIDEzbDkgMTEtOSAxMU0yNyAxMWwtNiAyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTUxYjEzIiBzdHJva2Utd2lkdGg9IjMuMyIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPgo=" alt=""><div><div class="brand-name">teard0wn<span> lab</span></div><div class="brand-sub">SYSTEMS · SECURITY · RESEARCH</div></div></a>
  <div><div class="navlabel">Workspace</div><nav class="navgroup">
- ${[['home','grid','Overview'],['curriculum','book','Curriculum'],['compiled','code','Compiled C'],['cfg','flow','Control flow'],['diff','diff','Binary diff'],['decomp','split','Disassembly'],['types','struct','Structs'],['exploit','shield','Exploitation'],['fuzz','target','Fuzzing'],['asan','scan','Sanitizer'],['concurrency','threads','Concurrency'],['elf','layers','Linking'],['progress','chart','Your progress'],['reference','chip','Engine reference']].map(([id,ic,label])=>`<a class="navitem ${active===id?'active':''}" href="#${id}" ${active===id?'aria-current="page"':''}>${icon(ic)}${label}${id==='curriculum'?`<span class="count">${tracks.length}</span>`:id==='compiled'?`<span class="count">${compiledLessons.length}</span>`:id==='fuzz'?`<span class="count">${fuzzTargets.length}</span>`:id==='concurrency'?`<span class="count">${litmus.length}</span>`:''}</a>`).join('')}
+ ${[['home','grid','Overview'],['curriculum','book','Curriculum'],['compiled','code','Compiled C'],['cfg','flow','Control flow'],['diff','diff','Binary diff'],['decomp','split','Disassembly'],['types','struct','Structs'],['exploit','shield','Exploitation'],['fuzz','target','Fuzzing'],['asan','scan','Sanitizer'],['symex','sigma','Symbolic'],['concurrency','threads','Concurrency'],['elf','layers','Linking'],['progress','chart','Your progress'],['reference','chip','Engine reference']].map(([id,ic,label])=>`<a class="navitem ${active===id?'active':''}" href="#${id}" ${active===id?'aria-current="page"':''}>${icon(ic)}${label}${id==='curriculum'?`<span class="count">${tracks.length}</span>`:id==='compiled'?`<span class="count">${compiledLessons.length}</span>`:id==='fuzz'?`<span class="count">${fuzzTargets.length}</span>`:id==='concurrency'?`<span class="count">${litmus.length}</span>`:''}</a>`).join('')}
  </nav></div><div><div class="navlabel">Continue learning</div><a class="navitem" href="#lab/${nextLesson().id}">${icon('play')}<span>${esc(nextLesson().title)}</span></a></div>
  <div class="sidebar-bottom"><div class="prereq-card"><div class="eyebrow">Before you begin</div><p>Know the machine beneath the code.</p>${external(prerequisite,'Memory Systems Lab')}</div><div class="version"><span>v0.1 · foundation release</span><span>LOCAL</span></div></div></aside>
  <header class="topbar"><div class="row"><button class="mobile-menu iconbtn" id="menu" aria-label="Open navigation" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb"><span class="path-label">teard0wn lab</span><span class="path-label">/</span><span>${esc(crumb)}</span></div></div><div class="top-right"><span class="top-note">YOUR BROWSER. YOUR WORKBENCH.</span><a class="iconbtn github-link" href="https://github.com/himasudo/teard0wn-lab" target="_blank" rel="noopener noreferrer" aria-label="Project source on GitHub">${icon('github')}</a><button class="iconbtn" id="theme" aria-label="Switch to ${state.theme==='dark'?'light':'dark'} theme">${icon('sun')}</button></div></header>
@@ -2295,6 +2386,7 @@ function home(){
   <a class="feature-card" href="#types"><span class="feature-ic">${icon('struct')}</span><h3>Structure recovery</h3><p>Rebuild a struct — fields, types, and padding — from its access pattern alone.</p></a>
   <a class="feature-card" href="#exploit"><span class="feature-ic">${icon('shield')}</span><h3>Exploitation &amp; mitigations</h3><p>The stack-overflow exploit chain and the defense that breaks each step.</p></a>
   <a class="feature-card" href="#asan"><span class="feature-ic">${icon('scan')}</span><h3>Sanitizer / shadow memory</h3><p>Redzones that catch the out-of-bounds access the CPU never faults on.</p></a>
+  <a class="feature-card" href="#symex"><span class="feature-ic">${icon('sigma')}</span><h3>Symbolic execution</h3><p>Lift a validator into an equation over its input and solve the crackmes automatically.</p></a>
   <a class="feature-card" href="#elf"><span class="feature-ic">${icon('layers')}</span><h3>Linking &amp; loading</h3><p>A real ELF: segments, relocations, and PLT/GOT lazy binding.</p></a>
  </div>
  <div class="section-head"><div><div class="eyebrow">THE LEARNING PATH</div><h2>Your next layer</h2><p>Foundations first. Deep investigations ahead.</p></div><a class="textlink" href="#curriculum">Full curriculum${icon('arrow')}</a></div>
@@ -2544,6 +2636,22 @@ function typesView(id){
  <details class="ty-reveal"><summary>Reveal the original struct</summary><pre class="mono">${esc(cur.csource)}</pre></details>
  <div class="notice"><strong>Reading the layout.</strong> ${esc(cur.note)}</div>`);
 }
+function symView(id){
+ const targets=[{id:'xor-key',bits:8},{id:'rolling-hash',bits:8},{id:'checksum-gate',bits:16}];
+ const cur=targets.find(t=>t.id===id)||targets[0];
+ const l=lessons.find(x=>x.id===cur.id);
+ const r=symSolve(assemble(l.starter),cur.bits);
+ const picker=targets.map(t=>`<a class="cfg-pick ${t.id===cur.id?'active':''}" href="#symex/${t.id}">${esc(lessons.find(x=>x.id===t.id).title)}</a>`).join('');
+ const sols=r.solutions.map(s=>`0x${s.toString(16)} (${s})`).join(',  ')+(r.solutions.length>=6?',  …':'');
+ shell('symex','Symbolic execution',`<div class="page-title"><div class="eyebrow">AUTOMATED BUG-FINDING · SYMBOLIC EXECUTION</div><h1>Solving the crackmes automatically.</h1><p>Instead of running a validator on one input, symbolic execution runs it on a variable, x. Each instruction builds an expression over x instead of a number, so by the accept check the whole path has become a single equation — the path constraint. Solving that constraint recovers the key: the same answer you reach by inverting the chain by hand, produced by a tool.</p></div>
+ <div class="cfg-picker">${picker}</div>
+ <div class="sym-out">
+  <div class="sym-row"><span class="sym-lbl">Validator (symbolically executed)</span><pre class="sym-asm mono">${esc(l.starter.split('\n').slice(0,12).join('\n'))}</pre></div>
+  <div class="sym-row"><span class="sym-lbl">Recovered path constraint</span><code class="sym-expr">${esc(r.expr)} == ${esc(r.target)}</code></div>
+  <div class="sym-row"><span class="sym-lbl">Solver result</span><code class="sym-sol">x ∈ { ${esc(sols)} }</code></div>
+ </div>
+ <div class="notice"><strong>What just happened.</strong> No input was guessed. The engine lifted the validator into an expression over x, and the accept branch turned into an equation. ${cur.id==='checksum-gate'?'Because this gate only checks a sum, the solver returns a whole family of keys — the structural weakness the checksum lab describes.':'The constraint is bijective here, so there is exactly one key.'} Real engines hand the constraint to an SMT solver (Z3) rather than enumerating; the domains here are small enough to solve by search, but the lifting is the same idea that scales to finding crashing inputs in real programs.</div>`);
+}
 function asanView(){
  const shadow=buildShadow({redzone:16,alloc:20});
  const strip=set=>`<div class="asan-strip">${shadow.bytes.map((b,i)=>`<span class="asan-cell ${b.zone}${set&&set.has(i)?' touched':''}"></span>`).join('')}</div>`;
@@ -2574,7 +2682,7 @@ function progress(){shell('progress','Your progress',`<div class="page-title"><d
 }
 function reference(){shell('reference','Engine reference',`<div class="page-title"><div class="eyebrow">KNOW YOUR INSTRUMENT</div><h1>What this machine does.</h1><p>Real x86-64 instruction encodings, executed by an explicitly bounded teaching engine. Understand the model before drawing conclusions from it.</p></div><article class="prose"><h2>Execution model</h2><p>The assembler emits machine-code bytes, resolves labels, and maps instructions to source lines. The executor decodes bytes at RIP; it does not merely animate source text. Registers use BigInt for exact 64-bit integers. Execution is single-threaded, deterministic, and limited by an instruction budget.</p><p>This is not a complete x86 CPU, Linux VM, C/C++ compiler, or native debugger. It models the subset below, a small address map, and two successful syscall cases. It does not measure your processor, implement timing, or run operating-system/kernel experiments.</p><h2>Supported instruction families</h2><table><thead><tr><th>Family</th><th>Instructions</th><th>Boundaries</th></tr></thead><tbody><tr><td>Data</td><td>MOV, LEA</td><td>Register/immediate and register/memory forms. No memory-to-memory MOV.</td></tr><tr><td>Arithmetic</td><td>ADD, SUB, CMP, INC, DEC, NEG, IMUL</td><td>IMUL is the two-operand 16/32/64-bit form. No division or carry-chain instructions.</td></tr><tr><td>Logic</td><td>AND, OR, XOR, TEST, NOT</td><td>8/16/32/64-bit widths.</td></tr><tr><td>Shifts</td><td>SHL, SHR, SAR</td><td>Immediate counts. Undefined flags display ?.</td></tr><tr><td>Control</td><td>JMP, Jcc, CALL, RET, NOP, INT3</td><td>Direct near label branches. No indirect branches or privileged instructions.</td></tr><tr><td>Stack</td><td>PUSH, POP</td><td>64-bit registers; PUSH also accepts a signed 32-bit immediate.</td></tr><tr><td>Boundary</td><td>SYSCALL</td><td>Modeled Linux x86-64 write(1) to stdout/stderr and exit(60), only.</td></tr></tbody></table><h2>Registers, flags, and addresses</h2><ul><li>RAX–R15 and their 32/16/low-8-bit views. Writes to a 32-bit register zero the upper half. AH/BH/CH/DH are not supported.</li><li>CF, PF, AF, ZF, SF, OF. Undefined flags are represented explicitly; using an undefined condition causes a teaching-engine fault.</li><li>Memory expressions: base + index × 1/2/4/8 + signed 32-bit displacement. Address registers are 64-bit. No RIP-relative, segment, or address-size-override forms.</li><li>Mapped code is read-only/executable. Data and stack are writable/non-executable. These are fixture permissions, not a full page-table implementation.</li></ul><table><thead><tr><th>Region</th><th>Addresses</th><th>Behavior</th></tr></thead><tbody><tr><td>Code</td><td>0x1000 to the assembled code end (below 0x2000)</td><td>RX, at most 4 KiB</td></tr><tr><td>Data</td><td>0x2000–0x3fff</td><td>RW, zero-initialized outside declared data</td></tr><tr><td>Stack</td><td>0x7000–0x7fff</td><td>RW; initial RSP 0x7ff8</td></tr><tr><td>Harness return</td><td>0xfff0</td><td>Synthetic sentinel; RET to it ends the function</td></tr></tbody></table><h2>Debugger behavior</h2><p>Step executes exactly one machine instruction. Over runs a called function to completion and stops at the instruction after the call; Finish runs to the current function’s return. Breakpoints and watchpoints still stop execution inside a stepped-over or finished region. Address breakpoints stop before an instruction. Write watchpoints stop after an instruction touches the selected byte. Back restores registers, flags, memory writes, output, and call-event state for the most recent 512 steps. Build resets the machine and clears breakpoints/watches. Run yields to the browser between instruction batches and stops after 10,000 instructions.</p><h2>Source and input</h2><p>Use Intel syntax with destination first. Labels and register names are case-insensitive. Semicolon and # introduce comments outside quoted literals. The .text/.data sections and .byte/.quad/.zero/.ascii/.asciz data directives are supported. Memory sizes are byte, word, dword, or qword ptr. Source is limited to 64,000 characters. Input accepts decimal/hex/binary integers fitting 64 bits.</p><h2>Honest limits</h2><p>Source-to-machine mappings describe this assembler, not compiler optimization or DWARF. The call list records CALL/RET events; it cannot reconstruct an arbitrary corrupted native call stack. Modeled WRITE completes in full and does not reproduce real short writes, signals, errno, or file descriptors. Flags and instruction behaviors are checked against native x86-64 in the repository tests, but that is evidence for the tested subset, not full CPU conformance.</p><p>There is no native C compiler in the browser release. The repository includes separate native C investigations and GNU assembly export. Future kernel, TrustZone, fuzzing, and PMU laboratories need their own validated runtime. Their syllabus is retained in the curriculum.</p><h2>References and project files</h2><p>${external(sources.intel.url,sources.intel.label)}<br>${external(sources.abi.url,sources.abi.label)}<br>${external(sources.gas.url,sources.gas.label)}</p><p><a class="textlink" href="./docs/ENGINE.md">Detailed engine contract</a> · <a class="textlink" href="./docs/CURRICULUM.md">Coverage ledger</a> · <a class="textlink" href="./README.md">Project README</a></p></article>`);}
 function notFound(){shell('home','Not found','<div class="empty"><h1>This page does not exist.</h1><p>The requested lesson or track may have moved.</p><a class="btn primary" href="#curriculum">Open curriculum</a></div>');}
-function route(){const path=location.hash.slice(1)||'home';if(path==='main')return;saveDraft();stopRun();current=null;machine=null;document.title='teard0wn lab — '+(path.startsWith('lab/')?(lessonById(path.slice(4))?.title||'Lab'):'Understand every layer');fuzzRunning=false;fuzzToken++;if(path==='home')home();else if(path==='curriculum')curriculum();else if(path==='compiled')compiledIndex();else if(path==='cfg')cfgView();else if(path.startsWith('cfg/'))cfgView(path.slice(4));else if(path==='diff')diffView();else if(path.startsWith('diff/'))diffView(path.slice(5));else if(path==='decomp')decompView();else if(path==='types')typesView();else if(path.startsWith('types/'))typesView(path.slice(6));else if(path==='exploit')exploitView();else if(path==='asan')asanView();else if(path==='fuzz')fuzzIndex();else if(path==='concurrency')concurrency();else if(path==='elf')elfView();else if(path==='progress')progress();else if(path==='reference')reference();else if(path.startsWith('track/'))track(path.slice(6));else if(path.startsWith('lab/'))lab(path.slice(4));else if(path.startsWith('clab/'))clab(path.slice(5));else if(path.startsWith('flab/'))flab(path.slice(5));else notFound();window.scrollTo(0,0);}
+function route(){const path=location.hash.slice(1)||'home';if(path==='main')return;saveDraft();stopRun();current=null;machine=null;document.title='teard0wn lab — '+(path.startsWith('lab/')?(lessonById(path.slice(4))?.title||'Lab'):'Understand every layer');fuzzRunning=false;fuzzToken++;if(path==='home')home();else if(path==='curriculum')curriculum();else if(path==='compiled')compiledIndex();else if(path==='cfg')cfgView();else if(path.startsWith('cfg/'))cfgView(path.slice(4));else if(path==='diff')diffView();else if(path.startsWith('diff/'))diffView(path.slice(5));else if(path==='decomp')decompView();else if(path==='types')typesView();else if(path.startsWith('types/'))typesView(path.slice(6));else if(path==='exploit')exploitView();else if(path==='asan')asanView();else if(path==='symex')symView();else if(path.startsWith('symex/'))symView(path.slice(6));else if(path==='fuzz')fuzzIndex();else if(path==='concurrency')concurrency();else if(path==='elf')elfView();else if(path==='progress')progress();else if(path==='reference')reference();else if(path.startsWith('track/'))track(path.slice(6));else if(path.startsWith('lab/'))lab(path.slice(4));else if(path.startsWith('clab/'))clab(path.slice(5));else if(path.startsWith('flab/'))flab(path.slice(5));else notFound();window.scrollTo(0,0);}
 window.addEventListener('hashchange',route);window.addEventListener('beforeunload',saveDraft);window.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#sidebar')?.classList.remove('open');$('#menu')?.setAttribute('aria-expanded','false');if(running){stopRun();machine.reason='Paused by you';renderExecution();}}});
 $('.skip').onclick=e=>{e.preventDefault();const main=$('#main');main.tabIndex=-1;main.focus();main.scrollIntoView();};
 route();
