@@ -111,3 +111,18 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .cfg-succ.taken{border-color:var(--accent);color:var(--accent)}
 .cfg-succ.back{border-color:var(--blue);color:var(--blue)}
 .cfg-succ:hover{background:var(--surface2)}
+
+/* Binary-diff view */
+.diff-legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0;font-size:12px}
+.diff-key{padding:2px 8px;border-radius:4px}
+.diff-key.add{background:rgba(63,160,106,.16);color:#3fa06a}
+.diff-key.del{background:var(--redbg);color:var(--red)}
+.diff-stats{color:var(--muted)}
+.diff-view{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface);max-width:720px}
+.diff-row{display:flex;align-items:flex-start;font-size:12.5px;line-height:1.75}
+.diff-row code{padding:1px 10px;white-space:pre;overflow-x:auto;flex:1;color:var(--text)}
+.diff-gut{width:22px;text-align:center;color:var(--muted);user-select:none;flex:none}
+.diff-row.add{background:rgba(63,160,106,.12)}
+.diff-row.add .diff-gut,.diff-row.add code{color:#3fa06a}
+.diff-row.del{background:var(--redbg)}
+.diff-row.del .diff-gut,.diff-row.del code{color:var(--red)}

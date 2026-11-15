@@ -1,0 +1,6 @@
+[
+  {"id":"bounds-patch","title":"A missing bounds check","fn":"get","label_a":"vulnerable","label_b":"patched",
+   "note":"The patch inserts an unsigned bounds check before the indexed load. The vulnerable build reads a[i] for any i, including out-of-range and negative values; the fix rejects i >= 4 first. This added compare-and-branch is the entire security fix."},
+  {"id":"signed-patch","title":"A signed check made unsigned","fn":"pick","label_a":"vulnerable","label_b":"patched",
+   "note":"The only change is the comparison: the vulnerable build uses a signed test (so a negative index passes), the patch uses an unsigned one. A single changed branch instruction is the fix — the kind of one-instruction delta patch-diffing exists to find."}
+]
