@@ -332,6 +332,54 @@ denied:
  quiz:{q:'Why is the branch to the decoy never taken?',options:['The input is always even.','x·(x+1) is always even, so its low bit is 0 and the condition is constant.','The decoy was removed by the compiler.'],answer:1,why:'x·x + x = x·(x+1) is the product of two consecutive integers, always even, so the tested low bit is always 0 regardless of input.'},refs:['intel']
 },
 {
+ id:'vm-crackme',track:'crackmes',title:'Reverse a bytecode VM',subtitle:'The logic lives in data, run by a dispatch loop.',duration:60,difficulty:'Advanced',input:'0',inputLabel:'Candidate byte (0–255)',mode:'solve',goal:'The validator is a tiny virtual machine executing a bytecode program against your input. Read the bytecode, recover the opcodes, and invert the program to find the accepting byte.',
+ starter:`entry:
+    mov eax, edi
+    and eax, 0xff
+    xor ecx, ecx
+    lea rsi, [bc]
+vmloop:
+    mov rdx, qword ptr [rsi+rcx*8]
+    cmp edx, 3
+    je vmdone
+    mov rbx, qword ptr [rsi+rcx*8+8]
+    cmp edx, 0
+    je op_xor
+    cmp edx, 1
+    je op_add
+    jmp vmnext
+op_xor:
+    xor eax, ebx
+    jmp vmmask
+op_add:
+    add eax, ebx
+vmmask:
+    and eax, 0xff
+vmnext:
+    add ecx, 2
+    jmp vmloop
+vmdone:
+    cmp eax, 0x50
+    jne denied
+    mov eax, 1
+    ret
+denied:
+    xor eax, eax
+    ret
+.data
+bc:
+    .quad 1, 0x11
+    .quad 0, 0x3c
+    .quad 1, 0x05
+    .quad 3, 0`,
+ answer:'102',initial:n=>({edi:n}),check:(m,n)=>n>=0n&&n<=255n&&retValue(m,1n),
+ sections:[section('The code is a loop; the logic is data','There is no straight-line check here. The function seeds an accumulator with the input, then runs a fetch-decode-execute loop over a bytecode program stored in .data. Each step reads an opcode and an operand, dispatches on the opcode, and updates the accumulator. The real algorithm is in the bytecode, not the instructions.','This is how virtual-machine obfuscation works: the visible code is a generic interpreter, nearly identical across every protected program, and the secret is the bytecode it runs. To reverse it you first reverse the VM — its opcodes — then read the program.'),
+ section('Recover the instruction set','Two opcodes do work here. Opcode 0 XORs the accumulator with the operand; opcode 1 adds it; opcode 3 halts. The bytecode cells spell out four instructions: ADD 0x11, XOR 0x3c, ADD 0x05, HALT. After the loop, the accumulator is compared with 0x50, and every operation masks to a byte.','Decoding the dispatch chain gives you the opcode semantics; reading the .data cells gives you the program. Together they are an ordinary transformation of the input — the VM was only hiding it behind a loop.'),
+ section('Invert the program','Run the recovered program backwards from 0x50. Undo ADD 0x05: 0x50 − 5 = 0x4b. Undo XOR 0x3c: 0x4b XOR 0x3c = 0x77. Undo ADD 0x11: 0x77 − 0x11 = 0x66 = 102. Enter 102 and the machine accepts.','Commercial protectors such as VMProtect and Themida scale this up — larger instruction sets, randomized opcodes, nested VMs — but the method is the same: lift the bytecode back to operations, then solve. Doing it once by hand is how you learn to automate it.')],
+ hints:['The loop reads (opcode, operand) pairs from .data until a halt opcode.','Opcode 0 is XOR, 1 is ADD, 3 is HALT; the program is ADD 0x11, XOR 0x3c, ADD 0x05.','Invert the three operations from the target 0x50.'],
+ quiz:{q:'Why is VM-based obfuscation hard to reverse at scale?',options:['The interpreter is encrypted.','The real logic is bytecode data run by a generic loop, so you must recover the opcode semantics first.','Virtual machines cannot be debugged.'],answer:1,why:'The visible code is a reusable interpreter; the secret is the bytecode it executes, so reversing means lifting the bytecode back to operations before you can solve it.'},refs:['intel']
+},
+{
  id:'three-gates',track:'crackmes',title:'Three gates, one key',subtitle:'Keep every path constraint in view.',duration:40,difficulty:'Intermediate',input:'256',inputLabel:'Candidate key (0–65535)',mode:'solve',goal:'Find a key accepted by the unmodified three-gate validator.',
  starter:`entry:
     cmp edi, 0x100
