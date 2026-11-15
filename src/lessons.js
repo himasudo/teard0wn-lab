@@ -270,6 +270,109 @@ values:
  section('Reproduce, explain, repair','Run index 4 on the starter and inspect the returned zero. That result is from bytes beyond the object; it is not proof that the function safely supports a fifth element. Then test a huge index and observe how address formation behaves.','Add the guard and an error-return path. Verify the repaired program across ordinary, boundary, and wraparound-provoking inputs. This teaches one spatial-safety invariant. Heap lifetime, integer allocation sizes, format strings, and concurrent lifetime errors are separate units in the same track.')],hints:['The array has four entries; valid unsigned indices are strictly less than 4.','Compare RDI with 4 before the memory load, and reject with JAE.','Return mov rax, -1 on the invalid path.'],quiz:{q:'Why can reading one element past an array return a value instead of faulting?',options:['The CPU tracks every array size and extends it.','The address may remain inside a readable mapped region.','Out-of-bounds reads always return zero.'],answer:1,why:'Page permissions do not encode individual object boundaries. Zero here is just this fixture’s initialized memory.'},refs:['intel','memory']
 },
 {
+ id:'signed-bound',track:'vulnerabilities',title:'A signed check on an unsigned index',subtitle:'The guard is there — it just compares the wrong way.',duration:40,difficulty:'Intermediate',input:'4',inputLabel:'Untrusted index (RDI)',mode:'repair',goal:'Return buf[i] for indices 0–3 and UINT64_MAX for every other tested input, including a negative index and the off-by-one at 4.',
+ starter:`entry:
+    cmp rdi, 4
+    jg invalid
+    lea rsi, [buf]
+    mov rax, qword ptr [rsi+rdi*8]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+buf:
+    .quad 10, 20, 30, 40`,
+ solution:`entry:
+    cmp rdi, 4
+    jae invalid
+    lea rsi, [buf]
+    mov rax, qword ptr [rsi+rdi*8]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+buf:
+    .quad 10, 20, 30, 40`,initial:n=>({rdi:n}),cases:[0n,1n,2n,3n,4n,5n,0xffffffffffffffffn],check:(m,n)=>retValue(m,n<4n?[10n,20n,30n,40n][Number(n)]:-1n),
+ sections:[section('The bug is the comparison, not a missing check','This function already guards the index: it compares RDI with 4 and jumps away on failure. But it uses JG, a signed comparison. The index is an untrusted 64-bit value with no sign, so reading it as signed is the vulnerability.','JG asks whether RDI, read as a two’s-complement integer, is greater than 4. For an index of 0 to 3 that is fine. For a value like 0xffffffffffffffff it reads as −1, which is not greater than 4, so the guard passes and the access proceeds with an enormous effective address.'),
+ section('Reproduce both escapes','Enter 4 and run the starter. JG rejects only strictly-greater values, so 4 slips through and reads one element past the array — an off-by-one. Then enter −1: the harness stores 0xffffffffffffffff, the signed guard treats it as small, and the scaled access leaves mapped memory and faults.','Two different inputs break the same guard for the same reason: the comparison’s view of the number disagrees with how the address arithmetic uses it. Scaling by 8 only widens that disagreement.'),
+ section('Fix: compare as unsigned','Replace JG with JAE. Unsigned above-or-equal rejects 4 and every larger value, and because a negative index is a huge unsigned number it rejects those too — one comparison closes both escapes. Verify across 0, the last valid index, the off-by-one, and the negative case.','The lesson generalizes: index and length checks must use the unsigned jumps (JAE/JB/JBE/JA) whenever the value is an address, size, or count. A signed compare on attacker-controlled data is a recurring root cause in real advisories.')],
+ hints:['The guard uses a signed jump; the index is unsigned.','JAE rejects 4-and-above, and a negative index is huge when unsigned, so it is rejected too.','Keep the error path returning mov rax, -1.'],
+ quiz:{q:'Why does a negative-looking index pass a JG guard but fail a JAE guard?',options:['JG sign-extends the array base address.','As signed it is small, but as unsigned it is above the limit.','JAE reads a different register than JG.'],answer:1,why:'0xffffffffffffffff is −1 signed (not > 4) but about 1.8e19 unsigned (≥ 4). The access uses it as an unsigned offset, so the unsigned test is the correct one.'},refs:['intel','memory']
+},
+{
+ id:'index-truncation',track:'vulnerabilities',title:'A 32-bit check on a 64-bit index',subtitle:'The guard inspects half of the value the load uses.',duration:40,difficulty:'Intermediate',input:'4294967299',inputLabel:'Untrusted index (RDI)',mode:'repair',goal:'Return buf[i] for indices 0–3 and UINT64_MAX otherwise, including values whose low 32 bits look valid but whose full width does not.',
+ starter:`entry:
+    mov eax, edi
+    cmp eax, 4
+    jae invalid
+    lea rsi, [buf]
+    mov rax, qword ptr [rsi+rdi*8]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+buf:
+    .quad 10, 20, 30, 40`,
+ solution:`entry:
+    cmp rdi, 4
+    jae invalid
+    lea rsi, [buf]
+    mov rax, qword ptr [rsi+rdi*8]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+buf:
+    .quad 10, 20, 30, 40`,initial:n=>({rdi:n}),cases:[0n,1n,2n,3n,4n,0x100000003n,0x100000000n],check:(m,n)=>retValue(m,n<4n?[10n,20n,30n,40n][Number(n)]:-1n),
+ sections:[section('The guard and the use disagree on width','MOV EAX, EDI copies only the low 32 bits of the index, and the guard tests EAX. The load, however, addresses with the full 64-bit RDI. The check and the access are reading two different numbers that merely share a name.','Writing EAX also zeroes the upper half of RAX, which is why this reads as a deliberate narrowing. The programmer validated the index — but validated a truncated copy of it.'),
+ section('Reproduce the bypass','Enter 4294967299 (0x1_0000_0003). Its low 32 bits are 3, so CMP EAX, 4 passes, yet RDI is over four billion. The scaled address leaves the mapped region and the engine faults: a validated index that was never really validated.','Try 4294967296 (0x1_0000_0000): the low 32 bits are 0, the guard is perfectly satisfied, and the full index is still enormous. Any multiple of 2^32 plus a small value defeats the 32-bit check.'),
+ section('Fix: check the value you actually use','Compare the full-width RDI (CMP RDI, 4 / JAE) so the guard and the load agree, and drop the narrowing MOV EAX, EDI. Verify small valid indices, the boundary, and the two truncation inputs.','Width-mismatch bugs are quiet: on ordinary inputs the truncated and full values agree, so tests pass and the flaw hides until an attacker supplies a value whose halves disagree. Validate at the width of the eventual use.')],
+ hints:['The check reads EAX (32-bit); the load reads RDI (64-bit).','Compare the full RDI so the guard matches the access.','Remove the truncating MOV EAX, EDI.'],
+ quiz:{q:'Why does index 0x100000003 pass the starter’s guard?',options:['0x100000003 is numerically less than 4.','Its low 32 bits (3) are what CMP EAX, 4 tests.','JAE ignores the high bits of RDI.'],answer:1,why:'EAX holds only the low 32 bits (3), which passes, while the load scales the full 0x100000003 and goes out of bounds.'},refs:['intel','memory']
+},
+{
+ id:'off-by-one-guard',track:'vulnerabilities',title:'One past the end overwrites the length',subtitle:'An out-of-bounds write corrupts the metadata beside it.',duration:45,difficulty:'Intermediate',input:'4',inputLabel:'Index to write (RDI)',mode:'repair',goal:'Write only within buf[0..3] and return the intact length 4 for valid indices, UINT64_MAX otherwise. The out-of-range write at 4 must not reach the length field.',
+ starter:`entry:
+    cmp rdi, 4
+    ja invalid
+    lea rsi, [buf]
+    mov qword ptr [rsi+rdi*8], 255
+    mov rax, qword ptr [len]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+buf:
+    .quad 0, 0, 0, 0
+len:
+    .quad 4`,
+ solution:`entry:
+    cmp rdi, 4
+    jae invalid
+    lea rsi, [buf]
+    mov qword ptr [rsi+rdi*8], 255
+    mov rax, qword ptr [len]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+buf:
+    .quad 0, 0, 0, 0
+len:
+    .quad 4`,initial:n=>({rdi:n}),cases:[0n,1n,2n,3n,4n,5n],check:(m,n)=>retValue(m,n<4n?4n:-1n),
+ sections:[section('Off-by-one: the boundary is inclusive by mistake','The array holds four elements at indices 0 to 3. The guard uses JA — jump if above — so it rejects only indices strictly greater than 4. Index 4 is allowed, and buf[4] is the eight bytes immediately after the array: the len field.','This is the canonical off-by-one. A single wrong comparison, ≤ where < was meant, lets one element past the end be accessed. On a write, that element is whatever lives next in memory — here, a length the program trusts later.'),
+ section('Watch the corruption in memory','Open the Memory tab, enter 4, and step. The store lands at 0x2000+32, the len field, and changes 4 into 0xff. The function then returns that corrupted length. In a larger program a length inflated this way becomes the next bug: a loop or copy sized by it now runs far past its buffer.','This is why metadata adjacency matters. An out-of-bounds write is rarely interesting for the byte it corrupts; it is interesting for what that byte controls. Length and size fields sitting next to buffers are a recurring target.'),
+ section('Fix: make the boundary exclusive','Replace JA with JAE so index 4 is rejected along with everything larger. The valid writes to 0 through 3 still succeed and the length stays 4; the out-of-range write never reaches it. Verify every index, and confirm len is unchanged after a valid write.','The pattern to internalize: for N elements, valid indices are strictly less than N. JAE (reject ≥ N) and JB (accept < N) encode that; JA and JG do not. One comparison stands between a contained write and corrupted adjacent state.')],
+ hints:['JA allows index 4; valid indices are strictly below 4.','JAE rejects 4 and above, keeping the write inside buf.','The length field sits immediately after the array in memory.'],
+ quiz:{q:'Why is the out-of-bounds write more dangerous than an equivalent read here?',options:['Writes are slower than reads.','It corrupts a length the program later trusts.','The CPU faults on every write past an array.'],answer:1,why:'The stray write changes len from 4 to 0xff; any later use of that length then operates on a wrong, attacker-influenced size.'},refs:['intel','memory']
+},
+{
  id:'saved-return',track:'binary',title:'Who chooses the next instruction?',subtitle:'Follow a saved return address from data into control flow.',duration:45,difficulty:'Intermediate',input:'0',inputLabel:'Unused input',mode:'repair',goal:'In this deliberately vulnerable fixture, redirect the overwritten return address to win and reach its return value of 42.',
  starter:`entry:
     call vulnerable
