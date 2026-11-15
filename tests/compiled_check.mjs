@@ -6,8 +6,9 @@
 // Hermetic: it writes its own C sources, compiles at -O0 (the readable teaching
 // target) and -O2, links at a fixed base so intra-module calls are relocated,
 // and extracts the .text bytes. Requires Linux x86-64 with gcc, ld, objcopy, nm.
-// SIMD-vectorized output (e.g. -O2 128-bit array stores) is a documented boundary
-// and is skipped, not counted as a mismatch.
+// Packed SSE output (GNU vector types, and -O2 auto-vectorized moves/arith) now
+// runs in the engine and is checked here; only opcodes still outside the decoder
+// are skipped, not counted as a mismatch.
 import {Machine,CODE,unsigned} from '../src/machine.js';
 import {mkdtempSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
@@ -46,6 +47,22 @@ double favg(int a,int b){ return (a + b) / 2.0; }    /* cvtsi2sd, divsd -> xmm0 
 double harm(int n){ double s=0; for(int i=1;i<=n;i++) s+=1.0/i; return s; } /* addsd/divsd loop */
 int scale3(int n){ double x=n; return (int)(x*1.5 + 0.5); }  /* mulsd, cvttsd2si */
 int fcmp(int a,int b){ double x=a*1.0, y=b*2.0; return x<y?1:0; } /* comisd branch */
+typedef int v4si __attribute__((vector_size(16)));
+typedef unsigned v4su __attribute__((vector_size(16)));
+typedef long v2di __attribute__((vector_size(16)));
+typedef float v4sf __attribute__((vector_size(16)));
+typedef double v2df __attribute__((vector_size(16)));
+/* GNU vector types force gcc to emit packed SSE at -O0 and -O2 alike; the
+   volatile output array stops -O2 from re-vectorizing the horizontal reduce,
+   so each exercises one packed op plus the lane build/extract around it. */
+long vaddd(int x){ int ia[4]={x,x+1,x+2,x+3}; v4si a; __builtin_memcpy(&a,ia,16); v4si b={10,20,30,40}; v4si c=a+b; volatile int o[4]; __builtin_memcpy((int*)o,&c,16); return o[0]+o[3]-o[1]+o[2]; }         /* paddd */
+long vsubd(int x){ int ia[4]={x,x,x,x}; v4si a; __builtin_memcpy(&a,ia,16); v4si b={1,2,3,4}; v4si c=a-b; volatile int o[4]; __builtin_memcpy((int*)o,&c,16); return o[0]+o[3]; }                            /* psubd */
+long vaddq(long x){ long ia[2]={x,x+5}; v2di a; __builtin_memcpy(&a,ia,16); v2di b={100,200}; v2di c=a+b; volatile long o[2]; __builtin_memcpy((long*)o,&c,16); return o[0]-o[1]; }                         /* paddq */
+long vandd(unsigned x){ unsigned ia[4]={x,x,x,x}; v4su a; __builtin_memcpy(&a,ia,16); v4su b={0xff,0xff00,0xff0000,0xff000000u}; v4su c=a&b; volatile unsigned o[4]; __builtin_memcpy((unsigned*)o,&c,16); return (long)(o[0]+o[1]+o[2]+o[3]); }  /* pand */
+long vxord(unsigned x){ unsigned ia[4]={x,x,x,x}; v4su a; __builtin_memcpy(&a,ia,16); v4su b={1,2,3,4}; v4su c=a^b; volatile unsigned o[4]; __builtin_memcpy((unsigned*)o,&c,16); return (long)(o[0]^o[1]^o[2]^o[3]); }  /* pxor packed */
+float vaddps(int x){ float ia[4]={x,x+1,x+2,x+3}; v4sf a; __builtin_memcpy(&a,ia,16); v4sf b={1,2,3,4}; v4sf c=a+b; volatile float o[4]; __builtin_memcpy((float*)o,&c,16); return o[0]+o[3]-o[1]+o[2]; }       /* addps, cvtdq2ps -> xmm0 */
+double vaddpd(int x){ double ia[2]={x,x+1}; v2df a; __builtin_memcpy(&a,ia,16); v2df b={1,2}; v2df c=a+b; volatile double o[2]; __builtin_memcpy((double*)o,&c,16); return o[0]+o[1]; }                        /* addpd, cvtdq2pd -> xmm0 */
+double vmulpd(int x){ double ia[2]={x,x}; v2df a; __builtin_memcpy(&a,ia,16); v2df b={1.5,2.5}; v2df c=a*b; volatile double o[2]; __builtin_memcpy((double*)o,&c,16); return o[0]-o[1]; }                      /* mulpd -> xmm0 */
 `;
 const DRIVER = `
 #include <stdio.h>
@@ -84,6 +101,14 @@ int main(int c,char**v){
   else if(!strcmp(f,"harm")){double d=harm(A);uint64_t u;memcpy(&u,&d,8);printf("%016llx\\n",(unsigned long long)u);}
   else if(!strcmp(f,"scale3")) printf("%08x\\n",(uint32_t)scale3(A));
   else if(!strcmp(f,"fcmp")) printf("%08x\\n",(uint32_t)fcmp(A,B));
+  else if(!strcmp(f,"vaddd")) printf("%016llx\\n",(unsigned long long)(uint64_t)vaddd(A));
+  else if(!strcmp(f,"vsubd")) printf("%016llx\\n",(unsigned long long)(uint64_t)vsubd(A));
+  else if(!strcmp(f,"vaddq")) printf("%016llx\\n",(unsigned long long)(uint64_t)vaddq(A));
+  else if(!strcmp(f,"vandd")) printf("%016llx\\n",(unsigned long long)(uint64_t)vandd((unsigned)A));
+  else if(!strcmp(f,"vxord")) printf("%016llx\\n",(unsigned long long)(uint64_t)vxord((unsigned)A));
+  else if(!strcmp(f,"vaddps")){float d=vaddps(A);uint32_t u;memcpy(&u,&d,4);printf("%08x\\n",u);}
+  else if(!strcmp(f,"vaddpd")){double d=vaddpd(A);uint64_t u;memcpy(&u,&d,8);printf("%016llx\\n",(unsigned long long)u);}
+  else if(!strcmp(f,"vmulpd")){double d=vmulpd(A);uint64_t u;memcpy(&u,&d,8);printf("%016llx\\n",(unsigned long long)u);}
   else return 2;
   return 0;
 }
@@ -118,6 +143,14 @@ const PLAN = {
   harm:{ret:64,retReg:'xmm0',cases:[1,2,3,5,10].map(x=>[x])},
   scale3:{ret:32,cases:[2,5,100,-4,0].map(x=>[x])},
   fcmp:{ret:32,cases:[[1,1],[3,2],[2,3],[0,0]]},
+  vaddd:{ret:64,cases:[-5,0,3,100,-100000,2147483647].map(x=>[x])},
+  vsubd:{ret:64,cases:[0,7,-7,123456,-2147483648].map(x=>[x])},
+  vaddq:{ret:64,cases:[0,1,-1,1000000000000].map(x=>[x])},
+  vandd:{ret:64,cases:[0,4294967295,0xcafef00d,0x12345678].map(x=>[x])},
+  vxord:{ret:64,cases:[0,4294967295,0xdeadbeef,0x5a5a5a5a].map(x=>[x])},
+  vaddps:{ret:32,retReg:'xmm0',cases:[0,3,-2,1000000].map(x=>[x])},
+  vaddpd:{ret:64,retReg:'xmm0',cases:[0,3,-2,1000000].map(x=>[x])},
+  vmulpd:{ret:64,retReg:'xmm0',cases:[0,3,-2,7].map(x=>[x])},
 };
 const ARG=['rdi','rsi','rdx','rcx'];
 

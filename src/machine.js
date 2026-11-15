@@ -19,6 +19,13 @@ export const bitsToF64 = b=>{_fv.setBigUint64(0,unsigned(b,64),true);return _fv.
 export const f64ToBits = v=>{_fv.setFloat64(0,v,true);return _fv.getBigUint64(0,true);};
 export const bitsToF32 = b=>{_fv.setUint32(0,Number(unsigned(b,32)),true);return _fv.getFloat32(0,true);};
 export const f32ToBits = v=>{_fv.setFloat32(0,v,true);return BigInt(_fv.getUint32(0,true));};
+// Split a 128-bit value into 128/w lanes (lane 0 = low bits); pack them back.
+export const splitLanes = (v,w)=>{const n=128/w,m=mask(w),out=[];for(let i=0;i<n;i++)out.push((unsigned(v,128)>>BigInt(i*w))&m);return out;};
+export const packLanes = (arr,w)=>{let v=0n;for(let i=0;i<arr.length;i++)v|=unsigned(arr[i],w)<<BigInt(i*w);return v;};
+// Round-to-nearest-even and a float->int32 conversion with the x86 "integer
+// indefinite" (0x80000000) for out-of-range or NaN, matching cvt(t)ps2dq.
+const _rne = v=>{const f=Math.floor(v),d=v-f;return d<0.5?f:d>0.5?f+1:(f%2===0?f:f+1);};
+const toI32 = (v,trunc)=>{if(!Number.isFinite(v))return 0x80000000n;const iv=trunc?Math.trunc(v):_rne(v);return (iv<-2147483648||iv>2147483647)?0x80000000n:unsigned(BigInt(iv),32);};
 const le = (v,n)=>Array.from({length:n},(_,i)=>Number((BigInt(v)>>BigInt(8*i))&255n));
 const groups={add:0,or:1,and:4,sub:5,xor:6,cmp:7};
 const binBase={add:0x00,or:0x08,and:0x20,sub:0x28,xor:0x30,cmp:0x38};
@@ -235,7 +242,7 @@ export class Machine {
       const address=unsigned((base===null?0n:this.regs[base])+(index===null?0n:this.regs[index]*BigInt(scale))+disp);
       return {field,operand:{kind:'mem',width,address}};
     };
-    let name,args=[];
+    let name,args=[],simd=null;
     if(op===0x90)name='nop';else if(op===0xc3)name='ret';else if(op===0xcc)name='int3';
     else if(op===0xc9)name='leave';
     else if(op===0x98){name='cdqe';args=[{width:wide}];}
@@ -270,8 +277,29 @@ export class Machine {
       else if(op2===0x2a&&(mpfx==='f2'||mpfx==='f3')){const x=rm(wide);name=mpfx==='f2'?'cvtsi2sd':'cvtsi2ss';args=[{kind:'xmm',id:x.field},x.operand];}
       else if(op2===0x2c&&(mpfx==='f2'||mpfx==='f3')){const sz=mpfx==='f2'?64:32,x=rm(sz,true);name=mpfx==='f2'?'cvttsd2si':'cvttss2si';args=[reg(x.field,wide),x.operand];}
       else if((op2===0x2e||op2===0x2f)&&(mpfx===null||mpfx==='66')){const sz=mpfx==='66'?64:32,x=rm(sz,true);name=mpfx==='66'?'comisd':'comiss';args=[{kind:'xmm',id:x.field},x.operand];}
-      else if(op2===0xef&&mpfx==='66'){const x=rm(128,true);name='pxor';args=[{kind:'xmm',id:x.field},x.operand];}
-      else fail(`Unsupported 0F opcode 0x${op2.toString(16)}.`);
+      else if(mpfx==='66'&&[0xfc,0xfd,0xfe,0xd4,0xf8,0xf9,0xfa,0xfb,0xdb,0xdf,0xeb,0xef].includes(op2)){
+        // packed integer add/sub (b/w/d/q) and bitwise and/andn/or/xor, on xmm1, xmm2/m128
+        const x=rm(128,true),spec=({0xfc:['paddb','add',8],0xfd:['paddw','add',16],0xfe:['paddd','add',32],0xd4:['paddq','add',64],
+          0xf8:['psubb','sub',8],0xf9:['psubw','sub',16],0xfa:['psubd','sub',32],0xfb:['psubq','sub',64],
+          0xdb:['pand','and',0],0xdf:['pandn','andn',0],0xeb:['por','or',0],0xef:['pxor','xor',0]})[op2];
+        name=spec[0];simd={cls:'int',iop:spec[1],ew:spec[2]};args=[{kind:'xmm',id:x.field},x.operand];
+      }
+      else if((op2===0x58||op2===0x59||op2===0x5c||op2===0x5e)&&(mpfx===null||mpfx==='66')){
+        // packed single/double FP add/mul/sub/div, on all lanes of xmm1, xmm2/m128
+        const x=rm(128,true),fop=({0x58:'add',0x59:'mul',0x5c:'sub',0x5e:'div'})[op2],ew=mpfx==='66'?64:32;
+        name=fop+(ew===64?'pd':'ps');simd={cls:'fp',fop,ew};args=[{kind:'xmm',id:x.field},x.operand];
+      }
+      else if(op2===0x6e&&mpfx==='66'){const sz=(rex&8)?64:32,x=rm(sz);name=sz===64?'movq':'movd';args=[{kind:'xmm',id:x.field},x.operand];simd={move:'toxmm',sz};}
+      else if(op2===0x7e&&mpfx==='66'){const sz=(rex&8)?64:32,x=rm(sz);name=sz===64?'movq':'movd';args=[x.operand,{kind:'xmm',id:x.field}];simd={move:'fromxmm',sz};}
+      else if(op2===0x7e&&mpfx==='f3'){const x=rm(64,true);name='movq';args=[{kind:'xmm',id:x.field},x.operand];simd={move:'loq'};}
+      else if(op2===0xd6&&mpfx==='66'){const x=rm(64,true);name='movq';args=[x.operand,{kind:'xmm',id:x.field}];simd={move:'stoq'};}
+      else if(op2===0x70&&mpfx==='66'){const x=rm(128,true),ib=Number(imm(1));name='pshufd';args=[{kind:'xmm',id:x.field},x.operand];simd={shuf:ib};}
+      else if((op2===0x14||op2===0x15)&&(mpfx===null||mpfx==='66')){const x=rm(128,true),ew=mpfx==='66'?64:32;name=(op2===0x15?'unpckh':'unpckl')+(ew===64?'pd':'ps');args=[{kind:'xmm',id:x.field},x.operand];simd={unpck:true,ew,hi:op2===0x15};}
+      else if((op2===0x12||op2===0x16)&&(mpfx===null||mpfx==='66')){const x=rm(64,true),mem=x.operand.kind==='mem';name=op2===0x16?(mem?'movhps':'movlhps'):(mem?'movlps':'movhlps');args=[{kind:'xmm',id:x.field},x.operand];simd={half:op2===0x16?'high':'low'};}
+      else if(op2===0x5b){const x=rm(128,true);name=mpfx==='f3'?'cvttps2dq':mpfx==='66'?'cvtps2dq':'cvtdq2ps';args=[{kind:'xmm',id:x.field},x.operand];}
+      else if(op2===0xe6){const x=rm(128,true);name=mpfx==='f3'?'cvtdq2pd':mpfx==='f2'?'cvtpd2dq':'cvttpd2dq';args=[{kind:'xmm',id:x.field},x.operand];}
+      else if(mpfx==='66'&&[0x62,0x6a,0x6c,0x6d].includes(op2)){const x=rm(128,true);name=({0x62:'punpckldq',0x6a:'punpckhdq',0x6c:'punpcklqdq',0x6d:'punpckhqdq'})[op2];args=[{kind:'xmm',id:x.field},x.operand];simd={unpck:true,ew:(op2===0x6c||op2===0x6d)?64:32,hi:(op2===0x6a||op2===0x6d)};}
+      else fail(`Unsupported 0F opcode 0x${op2.toString(16)}${mpfx?' ('+mpfx+' prefix)':''}.`);
     }else if([0x88,0x89,0x8a,0x8b,0x8d].includes(op)){
       const w=[0x88,0x8a].includes(op)?8:wide,x=rm(w);name=op===0x8d?'lea':'mov';
       args=op===0x88||op===0x89?[x.operand,reg(x.field,w)]:[reg(x.field,w),x.operand];
@@ -296,7 +324,7 @@ export class Machine {
     }
     const next=BigInt(p);
     for(const a of args)if(a&&a.kind==='mem'&&a.ripRelative){a.address=unsigned(next+a.disp);delete a.ripRelative;delete a.disp;}
-    return {name,args,next,address:this.rip};
+    return {name,args,simd,next,address:this.rip};
   }
   zsp(result,width){this.flags.ZF=result===0n;this.flags.SF=!!(result&(1n<<BigInt(width-1)));let parity=0;for(let i=0;i<8;i++)parity^=Number((result>>BigInt(i))&1n);this.flags.PF=parity===0;}
   arithmetic(op,a,b,w){
@@ -309,6 +337,15 @@ export class Machine {
     const f=this.flags;
     switch(c>>1){case 0:need('OF');break;case 1:need('CF');break;case 2:need('ZF');break;case 3:need('CF','ZF');break;case 4:need('SF');break;case 5:need('PF');break;case 6:need('SF','OF');break;case 7:need('ZF','SF','OF');}
     const v=[f.OF,f.CF,f.ZF,f.CF||f.ZF,f.SF,f.PF,f.SF!==f.OF,f.ZF||(f.SF!==f.OF)][c>>1];return c&1?!v:v;
+  }
+  packedBinary(s,a,b){
+    if(s.cls==='int'){
+      if(s.ew===0)return unsigned(s.iop==='and'?a&b:s.iop==='andn'?(~a)&b:s.iop==='or'?a|b:a^b,128);
+      const la=splitLanes(a,s.ew),lb=splitLanes(b,s.ew);
+      return packLanes(la.map((x,i)=>s.iop==='add'?x+lb[i]:x-lb[i]),s.ew);
+    }
+    const w=s.ew,toF=w===64?bitsToF64:bitsToF32,toB=w===64?f64ToBits:f32ToBits,la=splitLanes(a,w),lb=splitLanes(b,w);
+    return packLanes(la.map((x,i)=>{const fa=toF(x),fb=toF(lb[i]),r=s.fop==='add'?fa+fb:s.fop==='sub'?fa-fb:s.fop==='mul'?fa*fb:fa/fb;return toB(r);}),w);
   }
   snapshot(){return {regs:[...this.regs],flags:{...this.flags},rip:this.rip,status:this.status,reason:this.reason,steps:this.steps,calls:this.calls.map(x=>({...x})),output:this.output,xmm:[...this.xmm]};}
   restore(s){Object.assign(this,{...s,regs:[...s.regs],flags:{...s.flags},calls:s.calls.map(x=>({...x})),xmm:[...(s.xmm||this.xmm)]});}
@@ -347,7 +384,29 @@ export class Machine {
         case 'comisd':case 'comiss':{const sd=name==='comisd',toF=sd?bitsToF64:bitsToF32,a=toF(this.xmm[dst.id]),b=toF(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,sd?64:32));
           this.flags.OF=this.flags.SF=this.flags.AF=false;
           if(Number.isNaN(a)||Number.isNaN(b)){this.flags.ZF=this.flags.PF=this.flags.CF=true;}else{this.flags.PF=false;this.flags.ZF=a===b;this.flags.CF=a<b;}break;}
-        case 'pxor':this.xmm[dst.id]=this.xmm[dst.id]^(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128));break;
+        case 'paddb':case 'paddw':case 'paddd':case 'paddq':case 'psubb':case 'psubw':case 'psubd':case 'psubq':
+        case 'pand':case 'pandn':case 'por':case 'pxor':case 'addps':case 'addpd':case 'subps':case 'subpd':
+        case 'mulps':case 'mulpd':case 'divps':case 'divpd':{
+          const b=src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128);this.xmm[dst.id]=this.packedBinary(d.simd,this.xmm[dst.id],b);break;}
+        case 'movd':case 'movq':{
+          if(d.simd.move==='toxmm')this.xmm[dst.id]=unsigned(this.read(src),d.simd.sz);
+          else if(d.simd.move==='fromxmm')this.write(dst,this.xmm[src.id]&mask(d.simd.sz));
+          else if(d.simd.move==='loq')this.xmm[dst.id]=(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,64))&mask(64);
+          else this.writeMem(dst.address,64,this.xmm[src.id]&mask(64));break;}
+        case 'pshufd':{const in4=splitLanes(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128),32),ib=d.simd.shuf;
+          this.xmm[dst.id]=packLanes([0,1,2,3].map(i=>in4[(ib>>(2*i))&3]),32);break;}
+        case 'unpcklps':case 'unpckhps':case 'unpcklpd':case 'unpckhpd':
+        case 'punpckldq':case 'punpckhdq':case 'punpcklqdq':case 'punpckhqdq':{
+          const w=d.simd.ew,la=splitLanes(this.xmm[dst.id],w),lb=splitLanes(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128),w),n=128/w,base=d.simd.hi?n/2:0,out=[];
+          for(let i=0;i<n/2;i++){out.push(la[base+i]);out.push(lb[base+i]);}this.xmm[dst.id]=packLanes(out,w);break;}
+        case 'cvtdq2ps':{const s=splitLanes(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128),32);this.xmm[dst.id]=packLanes(s.map(v=>f32ToBits(Math.fround(Number(signed(v,32))))),32);break;}
+        case 'cvtdq2pd':{const s=splitLanes(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128),32);this.xmm[dst.id]=packLanes([0,1].map(i=>f64ToBits(Number(signed(s[i],32)))),64);break;}
+        case 'cvtps2dq':case 'cvttps2dq':{const t=name==='cvttps2dq',s=splitLanes(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128),32);this.xmm[dst.id]=packLanes(s.map(b=>toI32(bitsToF32(b),t)),32);break;}
+        case 'cvtpd2dq':case 'cvttpd2dq':{const t=name==='cvttpd2dq',s=splitLanes(src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,128),64);this.xmm[dst.id]=packLanes([toI32(bitsToF64(s[0]),t),toI32(bitsToF64(s[1]),t),0n,0n],32);break;}
+        case 'movlhps':case 'movhps':case 'movhlps':case 'movlps':{
+          const lo=this.xmm[dst.id]&mask(64),hi=this.xmm[dst.id]>>64n,s=src.kind==='xmm'?this.xmm[src.id]:this.readMem(src.address,64);
+          if(d.simd.half==='high')this.xmm[dst.id]=lo|((src.kind==='xmm'?(s&mask(64)):s)<<64n);
+          else this.xmm[dst.id]=(hi<<64n)|(src.kind==='xmm'?(s>>64n):s);break;}
         case 'cmov':if(this.condition(d.args[2].condition))this.write(dst,rhs());break;
         case 'setcc':this.write(dst,this.condition(src.condition)?1n:0n);break;
         case 'cdqe':{const half=w/2;this.setReg(0,w,unsigned(signed(this.getReg(0,half),half),w));break;}

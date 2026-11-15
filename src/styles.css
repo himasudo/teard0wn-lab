@@ -79,5 +79,8 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .feature-card p{margin:0;font-size:13px;color:var(--muted);line-height:1.5}
 .pill.live{background:var(--accent);color:var(--accentink)}
 
-.xmm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.xmm-grid{display:grid;grid-template-columns:1fr;gap:6px;margin:8px 0}
+.register.xmm{align-items:center}
+.register.xmm .xmm-lanes{font-family:var(--mono);font-size:11px;display:flex;gap:4px;margin-left:8px}
+.register.xmm .xmm-lanes i{font-style:normal;padding:1px 4px;background:rgba(127,127,127,.14);border-radius:3px;letter-spacing:.3px}
 .register.xmm .xmm-f{color:var(--accent);font-size:11px;margin-left:auto;font-family:var(--mono)}

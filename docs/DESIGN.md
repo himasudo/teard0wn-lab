@@ -61,16 +61,14 @@ real CPU at three layers:
    `gcc`, run it natively, then run the **same bytes** in the engine and compare
    return values across many inputs. At `-O0` (the teaching target) real
    functions covering recursion, division/modulo, `switch`, local arrays,
-   variable shifts, and width conversion all match; `-O2` matches except SSE
-   vectorization.
+   variable shifts, and width conversion all match; `-O2` matches too, including
+   packed-SSE vectorized functions.
 
 ## Current boundaries
 
-- No SSE/AVX/x87. `-O2` output that vectorizes does not run (documented, skipped
-  in the differential rather than hidden).
-- RIP-relative operands are not decoded yet, so compiled code that touches
-  globals, string literals, or `.rodata` jump tables does not run. This is the
-  first decoder item before arbitrary compiled lessons.
+- Packed SSE/SSE2 runs (integer and FP lane arithmetic plus the lane-build/
+  extract moves `-O2` emits); 256-bit AVX (VEX encoding) and legacy x87 do not.
+  gcc's SSE2 baseline — what x86-64 uses by default — executes; `-mavx` does not.
 - Flat memory map for execution: results never depend on timing. Cache/TLB/branch
   behaviour is modelled separately as the Micro overlay (see below), not fed back
   into execution.
@@ -81,9 +79,17 @@ real CPU at three layers:
 - **Debugger.** Step (instruction), Over, Finish, Back, breakpoints, write
   watchpoints.
 - **Compiled C.** The decoder runs real `gcc -O0`/`-O2` output (RIP-relative,
-  `const` globals, strings, jump tables; SSE excepted). `tools/compile_lesson.py`
-  generates `src/compiled.js`; the Compiled C section shows C and asm side by
-  side with source-line `step`/`next` and instruction `stepi`.
+  `const` globals, strings, jump tables, and packed SSE2 vectorization).
+  `tools/compile_lesson.py` generates `src/compiled.js`; the Compiled C section
+  shows C and asm side by side with source-line `step`/`next` and instruction
+  `stepi`.
+- **SSE / packed SIMD.** Scalar FP and packed SSE2 run over a 16-register XMM
+  file: packed integer add/sub (8/16/32/64-bit lanes) and bitwise and/andn/or/
+  xor, packed single/double add/mul/sub/div, and the `movd`/`movq`, `pshufd`,
+  `unpck*`/`punpck*`, and `cvtdq2ps`/`cvtdq2pd` lane plumbing `-O2` emits to
+  build and reduce vectors — all bit-exact against the host. The Registers view
+  shows each XMM value as four int32 lanes and a double, and a compiled lesson
+  (`c-simd`) steps a `paddd` that adds four lanes at once.
 - **Microarchitecture overlay.** `src/micro.js` models the Memory Systems Lab
   machine's data caches, TLBs, and a bimodal predictor; the Micro tab shows
   per-instruction hit level, TLB outcome, prediction, and modeled cycles.
@@ -104,9 +110,9 @@ real CPU at three layers:
 
 ## Roadmap
 
-1. **Packed/vector arithmetic.** Scalar floating-point now runs (`movsd`,
-   `addsd`/`mulsd`/`divsd`, `cvtsi2sd`, `cvttsd2si`, `comisd`), bit-exact against
-   the host, and the Registers view shows the XMM file. The remaining gap is
-   *packed* SSE/AVX arithmetic (`paddd`, `addps`, …) and x87, which would let
-   vectorized floating-point loops execute. Between the single-threaded engine
-   and the scalar FP, essentially any scalar C function now runs.
+1. **AVX and x87.** Packed SSE2 now runs — integer and floating-point lane
+   arithmetic plus the `movd`/`pshufd`/`unpck`/`cvtdq2*` plumbing — so gcc's
+   SSE2-baseline `-O2` vectorized functions execute bit-exact (404 differential
+   cases across `-O0`/`-O2`). The remaining gaps are 256-bit AVX (VEX encoding)
+   and legacy x87. Between the scalar core, writable globals, and packed SSE,
+   essentially any SSE2-targeted C function now runs in the engine.

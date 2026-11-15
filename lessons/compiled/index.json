@@ -63,5 +63,18 @@
     "expect": "00000015",
     "retBits": 32,
     "intro": "Floating point lives in the XMM registers, not the general-purpose ones. The integers are converted with cvtsi2sd, summed and divided with addsd/divsd, then truncated back with cvttsd2si. Watch xmm0 in the Registers tab hold the running double. For 10, 20, 33 the mean is 21."
+  },
+  {
+    "id": "c-simd",
+    "file": "vecadd.c",
+    "entry": "vecsum",
+    "title": "Four lanes, one instruction (SSE)",
+    "subtitle": "A packed add does four integers at once.",
+    "track": "performance",
+    "inputLabel": "x (EDI)",
+    "input": { "rdi": 5 },
+    "expect": "0000007e",
+    "retBits": 32,
+    "intro": "A 128-bit XMM register holds four 32-bit integers side by side. The two vectors are loaded whole, and one paddd adds all four lanes at once — the hardware's data parallelism, made visible. Watch xmm0/xmm1 in the Registers tab show four lanes each, then step the paddd and see every lane update together. The reduce afterward reads the lanes back out one at a time. For x=5 the lanes are 15, 26, 37, 48, summing to 126."
   }
 ]
