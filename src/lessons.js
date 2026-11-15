@@ -373,6 +373,83 @@ len:
  quiz:{q:'Why is the out-of-bounds write more dangerous than an equivalent read here?',options:['Writes are slower than reads.','It corrupts a length the program later trusts.','The CPU faults on every write past an array.'],answer:1,why:'The stray write changes len from 4 to 0xff; any later use of that length then operates on a wrong, attacker-influenced size.'},refs:['intel','memory']
 },
 {
+ id:'size-overflow',track:'vulnerabilities',title:'A size computation that wraps',subtitle:'The capacity check passes because the multiply overflowed.',duration:45,difficulty:'Intermediate',input:'2305843009213693956',inputLabel:'Element count (RDI)',mode:'repair',goal:'Return buf[count−1] for counts 1–4 and UINT64_MAX for every other input, including 0 and counts whose byte size wraps past 2^64.',
+ starter:`entry:
+    mov rax, rdi
+    shl rax, 3
+    cmp rax, 32
+    ja invalid
+    lea rsi, [buf]
+    mov rax, qword ptr [rsi+rdi*8-8]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+buf:
+    .quad 10, 20, 30, 40`,
+ solution:`entry:
+    cmp rdi, 1
+    jb invalid
+    cmp rdi, 4
+    ja invalid
+    lea rsi, [buf]
+    mov rax, qword ptr [rsi+rdi*8-8]
+    ret
+invalid:
+    mov rax, -1
+    ret
+.data
+buf:
+    .quad 10, 20, 30, 40`,initial:n=>({rdi:n}),cases:[1n,2n,3n,4n,0n,5n,0x2000000000000004n],check:(m,n)=>retValue(m,(n>=1n&&n<=4n)?[10n,20n,30n,40n][Number(n)-1]:-1n),
+ sections:[section('The check guards bytes, the access uses elements','The function validates the request by its byte size: count times 8, compared against the 32-byte capacity. The access then indexes by count. The guard and the access agree only while count times 8 does not overflow.','Multiplying a 64-bit count by 8 can exceed 2^64 and wrap to a small number. A count of 0x2000000000000004 times 8 is 2^64 plus 32, which wraps to 32 and passes the ≤ 32 check even though the count is astronomically out of range.'),
+ section('Reproduce the wrap','Enter 2305843009213693956 (0x2000000000000004). SHL RAX, 3 wraps the byte size to 32, the guard passes, and the index happens to land back inside the array, returning a valid-looking 40 instead of an error. Now enter 0: the byte size is 0, the guard passes, and buf[count−1] reads buf[−1], one element before the array.','An overflowed size check does not always fault. Here it silently returns the wrong element; in an allocator it hands back a buffer far smaller than the caller believes it received, and the next write runs off the end.'),
+ section('Fix: validate the count, not the byte size','Bound the element count directly: reject counts below 1 and above 4 (CMP/JB and CMP/JA). An element count of 1 to 4 cannot overflow the way count times 8 can, so the guard and the access finally measure the same thing. Verify counts 1 through 4, zero, and the wrapping input.','Whenever a size is derived by multiplication or addition before a bounds check, the derivation itself can overflow and defeat the check. Validate the unmultiplied quantity, or test for overflow explicitly before trusting the product.')],
+ hints:['count times 8 can wrap past 2^64 and land under the capacity.','Bound the element count itself: reject below 1 and above 4.','Zero must be rejected too, or buf[count−1] reads before the array.'],
+ quiz:{q:'Why does a count of 0x2000000000000004 pass a check of count×8 ≤ 32?',options:['The count is actually a small number.','count×8 overflows 64 bits and wraps to 32.','The CPU saturates the multiply at 32.'],answer:1,why:'0x2000000000000004 × 8 = 2^64 + 32, which wraps to 32 in 64-bit arithmetic and passes the check.'},refs:['intel','memory']
+},
+{
+ id:'uninit-leak',track:'vulnerabilities',title:'An error path that leaks old memory',subtitle:'A reused buffer, returned without being written.',duration:40,difficulty:'Intermediate',input:'200',inputLabel:'Request value (RDI)',mode:'repair',goal:'Return 2×v for valid requests (v ≤ 100) and a sanitized 0 for rejected ones. The error path must not return the stale secret left in the result buffer.',
+ starter:`entry:
+    lea rsi, [res]
+    cmp rdi, 100
+    ja error
+    mov rax, rdi
+    add rax, rax
+    mov qword ptr [rsi+8], rax
+    mov rax, qword ptr [rsi+8]
+    ret
+error:
+    mov rax, qword ptr [rsi+8]
+    ret
+.data
+res:
+    .quad 0
+    .quad 0xdeadc0de`,
+ solution:`entry:
+    lea rsi, [res]
+    cmp rdi, 100
+    ja error
+    mov rax, rdi
+    add rax, rax
+    mov qword ptr [rsi+8], rax
+    mov rax, qword ptr [rsi+8]
+    ret
+error:
+    mov qword ptr [rsi+8], 0
+    mov rax, qword ptr [rsi+8]
+    ret
+.data
+res:
+    .quad 0
+    .quad 0xdeadc0de`,initial:n=>({rdi:n}),cases:[0n,1n,50n,100n,101n,0xffffffffffffffffn],check:(m,n)=>retValue(m,n<=100n?n*2n:0n),
+ sections:[section('A buffer reused across calls','The result object at res is reused between requests, and its data field still holds 0xdeadc0de from an earlier call. The success path overwrites that field with 2×v before returning it. The error path returns the field directly.','On the success path this is fine: the field is written, then read. The vulnerability is the path that reads the field without having written it on this call, exposing whatever a previous caller left behind.'),
+ section('Reproduce the leak','Enter 200. It exceeds the limit, so the function takes the error path and returns 0xdeadc0de — the stale secret — straight to the caller. Any rejected request leaks it. In real code the leaked bytes are often a pointer or a key, which can also defeat ASLR by revealing an address.','This is an information-disclosure bug, not memory corruption. Nothing crashes; the function simply returns data it never meant to expose. These are easy to miss precisely because the program behaves normally.'),
+ section('Fix: initialize every byte you return','On the error path, write the field before returning it: set data to 0, or return a dedicated error code, so no path returns uninitialized contents. Verify that valid requests still return 2×v and rejected ones return 0.','The invariant: a value is only safe to return if this call wrote it. Output buffers that are pooled or reused must be fully initialized on every path, or zeroed before use. Partial initialization plus an early return is the classic shape of a leak.')],
+ hints:['The error path returns res.data without writing it first.','Write 0 to the data field on the error path before returning it.','Valid requests (v ≤ 100) must still return 2×v.'],
+ quiz:{q:'Why does the error path return 0xdeadc0de?',options:['The CPU fills unwritten memory with that value.','The field keeps a previous call’s value and the error path never overwrites it.','0xdeadc0de equals 2 times the input.'],answer:1,why:'The reused buffer still holds the old value; only the success path overwrites it, so the error path returns stale memory.'},refs:['intel','memory']
+},
+{
  id:'saved-return',track:'binary',title:'Who chooses the next instruction?',subtitle:'Follow a saved return address from data into control flow.',duration:45,difficulty:'Intermediate',input:'0',inputLabel:'Unused input',mode:'repair',goal:'In this deliberately vulnerable fixture, redirect the overwritten return address to win and reach its return value of 42.',
  starter:`entry:
     call vulnerable
