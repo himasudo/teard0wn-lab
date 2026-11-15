@@ -2,7 +2,7 @@
 // a classifier (multiple blocks, a diamond) and a loop (a back-edge).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildCFG} from '../src/cfg.js';
+import {buildCFG, linearSweep, recursiveSweep} from '../src/cfg.js';
 import {compiledLessons} from '../src/compiled.js';
 
 const cfgOf = id => {
@@ -30,6 +30,19 @@ test('a branching function recovers multiple basic blocks and a merge', () => {
 test('a loop recovers a back-edge', () => {
   const {edges} = cfgOf('c-sum-to');
   assert.ok(edges.some(e => e.back), 'a loop produces a back-edge to a lower address');
+});
+
+test('linear and recursive disassembly diverge on overlapping instructions', () => {
+  // EB 03 (jmp +3 to 0x1005) · B8 90 90 31 C0 (decoy mov eax,imm32) · C3 (ret).
+  // The jump skips into the middle of the decoy, so the real xor at 0x1005 is
+  // hidden from a linear sweep but recovered by following control flow.
+  const blob = {codeHex: 'eb03b8909031c0c3', base: 0x1000, entry: 0x1000};
+  const lin = linearSweep(blob), rec = recursiveSweep(blob);
+  assert.ok(lin.some(i => i.name === 'mov'), 'linear sweep sees a decoy mov');
+  assert.ok(!lin.some(i => i.name === 'xor'), 'linear sweep never sees the real xor');
+  assert.ok(rec.some(i => i.name === 'xor'), 'recursive descent recovers the xor');
+  assert.ok(rec.some(i => i.addr === 0x1005), 'recursive descent has a leader at the jump target');
+  assert.ok(!lin.some(i => i.addr === 0x1005), 'linear sweep decodes across the jump target');
 });
 
 test('every edge references real blocks', () => {

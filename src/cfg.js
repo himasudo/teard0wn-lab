@@ -69,3 +69,51 @@ export function buildCFG({codeHex, dataHex = '', entry, base, textByAddr = {}}) 
   for (const e of edges) e.back = blocks[e.to].addr < blocks[e.from].addr;
   return {blocks, edges};
 }
+
+// Linear-sweep disassembly: decode straight through the bytes, one instruction
+// after the previous, ignoring control flow. Fast, and what a naive
+// disassembler does — but foolable, because a jump can land mid-instruction so
+// that the bytes a jump skips over are decoded as instructions that never run.
+export function linearSweep({codeHex, dataHex = '', entry, base}) {
+  const m = new Machine(programFromImage({codeHex, dataHex, entry}));
+  const end = base + codeHex.length / 2;
+  const out = [];
+  let addr = base;
+  while (addr < end) {
+    m.rip = BigInt(addr);
+    let d;
+    try { d = m.decode(); } catch (e) { out.push({addr, bad: true}); break; }
+    const next = Number(d.next);
+    out.push({addr, len: next - addr, name: d.name});
+    if (next <= addr) break;
+    addr = next;
+  }
+  return out;
+}
+
+// Recursive-descent disassembly: start at the entry and follow control flow —
+// fallthrough, branch targets, and both sides of a conditional — decoding only
+// bytes that are reachable as instruction starts. This recovers the code that
+// actually runs, even when it overlaps the linear decoding.
+export function recursiveSweep({codeHex, dataHex = '', entry, base}) {
+  const m = new Machine(programFromImage({codeHex, dataHex, entry}));
+  const end = base + codeHex.length / 2;
+  const seen = new Map();
+  const work = [entry ?? base];
+  while (work.length) {
+    let addr = work.pop();
+    while (addr >= base && addr < end && !seen.has(addr)) {
+      m.rip = BigInt(addr);
+      let d;
+      try { d = m.decode(); } catch (e) { break; }
+      const next = Number(d.next);
+      seen.set(addr, {addr, len: next - addr, name: d.name});
+      if (d.name === 'jmp') { if (d.args[0] && d.args[0].value !== undefined) work.push(Number(d.args[0].value)); break; }
+      if (d.name === 'jcc') { if (d.args[0] && d.args[0].value !== undefined) work.push(Number(d.args[0].value)); addr = next; continue; }
+      if (d.name === 'ret') break;
+      if (next <= addr) break;
+      addr = next;
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.addr - b.addr);
+}
