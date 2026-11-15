@@ -450,6 +450,36 @@ res:
  quiz:{q:'Why does the error path return 0xdeadc0de?',options:['The CPU fills unwritten memory with that value.','The field keeps a previous call’s value and the error path never overwrites it.','0xdeadc0de equals 2 times the input.'],answer:1,why:'The reused buffer still holds the old value; only the success path overwrites it, so the error path returns stale memory.'},refs:['intel','memory']
 },
 {
+ id:'use-after-free',track:'vulnerabilities',title:'A stale handle after free',subtitle:'A generation tag is the difference between use and use-after-free.',duration:45,difficulty:'Intermediate',input:'0',inputLabel:'Handle generation (RDI)',mode:'repair',goal:'Return the slot value only when the presented generation matches the slot’s current generation; reject every stale or wrong generation with UINT64_MAX.',
+ starter:`entry:
+    lea rsi, [slot]
+    mov rax, qword ptr [rsi+8]
+    ret
+.data
+slot:
+    .quad 1
+    .quad 0x1337`,
+ solution:`entry:
+    lea rsi, [slot]
+    mov rax, qword ptr [rsi]
+    cmp rdi, rax
+    jne stale
+    mov rax, qword ptr [rsi+8]
+    ret
+stale:
+    mov rax, -1
+    ret
+.data
+slot:
+    .quad 1
+    .quad 0x1337`,initial:n=>({rdi:n}),cases:[1n,0n,2n,5n],check:(m,n)=>retValue(m,n===1n?0x1337n:-1n),
+ sections:[section('Free, reuse, and a handle that outlived its object','The slot carries a generation counter. Freeing the object increments it; reusing the slot for a new object leaves the counter at its new value. A handle issued before the free still carries the old generation. Here the slot has been freed and reused once, so its current generation is 1, and a handle with generation 0 is stale.','A caller presents its handle’s generation in RDI. The starter ignores it and returns the slot value unconditionally, so a handle from before the free still reads the slot — a use-after-free, reaching an object that no longer exists at that handle.'),
+ section('Reproduce the stale access','Enter 0, the generation of a handle taken before the free. The starter returns 0x1337, the current occupant’s value, to a caller holding a dangling reference. Enter 2 or 5 and it still returns that value: with no check, any handle reads the slot whatever it claims.','Use-after-free is dangerous precisely because the slot is valid memory holding a different object now. The read succeeds and looks plausible; a write would corrupt the new object through the old handle. Nothing faults, which is why these bugs are subtle.'),
+ section('Fix: validate the generation before dereferencing','Load the slot’s current generation, compare it with the presented one, and reject on mismatch before touching the value. Only a handle whose generation equals the slot’s (1 here) passes. Verify the live handle returns the value and every stale or wrong generation returns the error.','This is how robust systems resist use-after-free without a garbage collector: tag each handle with a generation and check it on every access, so reusing a slot invalidates all prior handles. The invariant is temporal — identity must match in time, not only in address.')],
+ hints:['The presented generation is in RDI; the slot’s current generation is its first field.','Compare them and reject with mov rax, -1 before reading the value.','Only generation 1, the slot’s current value, is valid here.'],
+ quiz:{q:'Why does reading the slot with a stale handle not fault?',options:['The slot is unmapped immediately after free.','The slot is valid memory that now holds a different object.','Stale handles always read zero.'],answer:1,why:'After reuse the slot is live memory for a new object, so the stale read succeeds and returns that object’s data — which is the hazard.'},refs:['intel','memory']
+},
+{
  id:'saved-return',track:'binary',title:'Who chooses the next instruction?',subtitle:'Follow a saved return address from data into control flow.',duration:45,difficulty:'Intermediate',input:'0',inputLabel:'Unused input',mode:'repair',goal:'In this deliberately vulnerable fixture, redirect the overwritten return address to win and reach its return value of 42.',
  starter:`entry:
     call vulnerable
