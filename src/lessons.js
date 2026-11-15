@@ -190,6 +190,76 @@ record:
  section('Repair one access, then vary the data','Change the displacement to 16 and verify with several values, including one with every byte different and one with every bit set. This avoids passing by accidentally returning a constant that matches the current record.','The fixture writes the chosen value into memory before execution. The program must load it through the pointer; a repaired source file does not contain the test values. Later units connect these observations to debug information, C++ inheritance, vtables, and optimized access patterns.')],hints:['The displacement is measured in bytes.','There are two eight-byte fields before the desired value.','Load qword ptr [rdi+16].'],quiz:{q:'Does an 8-byte load at offset 16 prove the original member was named value?',options:['Yes; the instruction encodes its name.','No; it establishes an access width and offset, not the source-level name.','Only on little-endian machines.'],answer:1,why:'Names and some types may be absent from a stripped binary. Access patterns constrain hypotheses.'},refs:['intel','abi']
 },
 {
+ id:'xor-key',track:'crackmes',title:'Peel the XOR layers',subtitle:'Two keys and an add stand between input and accept.',duration:35,difficulty:'Intermediate',input:'0',inputLabel:'Candidate byte (0–255)',mode:'solve',goal:'Find the byte the validator accepts. It XORs with one key, adds a constant, then XORs with another — invert the chain to recover the input.',
+ starter:`entry:
+    mov eax, edi
+    and eax, 0xff
+    xor eax, 0x3c
+    add eax, 0x11
+    and eax, 0xff
+    xor eax, 0x7a
+    and eax, 0xff
+    cmp eax, 0x25
+    jne denied
+    mov eax, 1
+    ret
+denied:
+    xor eax, eax
+    ret`,
+ answer:'114',initial:n=>({edi:n}),check:(m,n)=>n>=0n&&n<=255n&&retValue(m,1n),
+ sections:[section('A chain of reversible steps','The validator transforms the input byte through three stages — XOR 0x3c, add 0x11, XOR 0x7a — and accepts only if the result is 0x25. Every stage is reversible, so the accepting input is not guessed but computed by running the chain backwards.','XOR is its own inverse; addition inverts to subtraction. Working from the target 0x25 back through the stages recovers the one byte that satisfies the whole chain, modulo 256 at each step.'),
+ section('Invert from the target','Start at 0x25 and undo the last step first: 0x25 XOR 0x7a = 0x5f. Undo the add: 0x5f − 0x11 = 0x4e. Undo the first XOR: 0x4e XOR 0x3c = 0x72, which is 114. Enter it and the gate opens.','This backward pass is the core crackme skill: a validator is a forward computation, and a key is the solution to running it in reverse. When every operation is invertible, there is exactly one answer.'),
+ section('Why the masking matters','Each stage masks to a byte (AND 0xff), so the arithmetic wraps at 256. A correct inversion respects that wrap — subtraction can borrow, and the byte-sized intermediate is what the next XOR sees. Keeping every value in 0–255 as you invert avoids an off-by-a-carry answer.','Obfuscators lean on exactly these cheap, reversible transforms to hide a constant. Recognizing a reversible chain and inverting it is faster than brute force and scales to longer chains.')],
+ hints:['Each operation is reversible: XOR undoes XOR, subtraction undoes addition.','Work backward from the target 0x25 through 0x7a, then −0x11, then 0x3c.','Keep every intermediate in the 0–255 range.'],
+ quiz:{q:'Why can this key be computed instead of guessed?',options:['The validator leaks the key in memory.','Every stage (XOR, add, XOR) is invertible, so the chain runs backward to one input.','The key is always 0.'],answer:1,why:'XOR is self-inverse and add inverts to subtract, so running the transform backward from the target yields the unique accepting byte.'},refs:['intel']
+},
+{
+ id:'checksum-gate',track:'crackmes',title:'A checksum over two bytes',subtitle:'The gate checks a sum of the input’s bytes, not the input.',duration:40,difficulty:'Intermediate',input:'0',inputLabel:'Candidate value (0–65535)',mode:'solve',goal:'Find a 16-bit value whose low and high bytes sum to 0x40. Many values qualify — recover the constraint and satisfy it.',
+ starter:`entry:
+    mov eax, edi
+    mov ecx, eax
+    shr ecx, 8
+    and ecx, 0xff
+    and eax, 0xff
+    add eax, ecx
+    cmp eax, 0x40
+    jne denied
+    mov eax, 1
+    ret
+denied:
+    xor eax, eax
+    ret`,
+ answer:'8224',initial:n=>({edi:n}),check:(m,n)=>n>=0n&&n<=0xffffn&&retValue(m,1n),
+ sections:[section('The validator splits the input','The code takes the 16-bit input, shifts right by 8 to isolate the high byte, masks the low byte, and adds them. It accepts only if the sum is 0x40. The gate does not care about the value itself — only about a relationship between its parts.','This is a checksum constraint: the accept condition is a function of the input’s structure, not a single magic number. Recognizing that the input is being decomposed is the first step to solving it.'),
+ section('Satisfy the constraint','Any two bytes that add to 0x40 work. The cleanest is 0x20 and 0x20: a high byte of 0x20 and a low byte of 0x20 give the value 0x2020, which is 8224. Enter it and the gate opens. 0x4000 and 0x0040 work too.','Unlike the single-answer XOR chain, a checksum has many solutions — the skill is to read what is being summed and construct any input that meets it. Real serial-number checks are built exactly this way.'),
+ section('From one constraint to many','Because the check only constrains a sum, a key generator for this gate would enumerate all byte pairs summing to 0x40. That is the difference between reversing a bijective transform (one key) and a checksum (a whole family), and why checksum gates are weak on their own.','Stacking a checksum with an invertible transform, as the harder challenges do, is what makes a validator actually hard: you must satisfy a structural constraint and invert a computation at once.')],
+ hints:['The input is split into a high byte (shift right 8) and a low byte (mask).','You need the two bytes to add up to 0x40.','0x2020 works: 0x20 + 0x20 = 0x40.'],
+ quiz:{q:'Why does this gate have many valid keys, unlike the XOR chain?',options:['It checks a sum of parts, which many inputs satisfy.','It accepts every input.','The key is stored in memory.'],answer:0,why:'The accept condition constrains only the sum of the two bytes, so any pair summing to 0x40 is a valid key.'},refs:['intel']
+},
+{
+ id:'rolling-hash',track:'crackmes',title:'Invert a multiply-and-mask hash',subtitle:'A hash gate needs a modular inverse, not a guess.',duration:45,difficulty:'Advanced',input:'0',inputLabel:'Candidate byte (0–255)',mode:'solve',goal:'Find the byte the hash accepts. It multiplies by 0x2d, adds 0x1f, keeps the low byte, and checks for 0x88 — invert it modulo 256.',
+ starter:`entry:
+    mov eax, edi
+    and eax, 0xff
+    mov ecx, 0x2d
+    imul eax, ecx
+    add eax, 0x1f
+    and eax, 0xff
+    cmp eax, 0x88
+    jne denied
+    mov eax, 1
+    ret
+denied:
+    xor eax, eax
+    ret`,
+ answer:'173',initial:n=>({edi:n}),check:(m,n)=>n>=0n&&n<=255n&&retValue(m,1n),
+ sections:[section('A hash is still invertible — if you know the math','The gate computes (input × 0x2d + 0x1f) mod 256 and accepts 0x88. Multiplication modulo 256 looks one-way, but because 0x2d (45) is odd it is invertible: there is a value that multiplies it back to 1. Undoing the add and the multiply recovers the input.','Addition inverts trivially: subtract 0x1f, giving 0x69. The hard step is the multiply — dividing modulo 256 is multiplying by the modular inverse of 45.'),
+ section('Find the modular inverse','45 is coprime with 256 because it is odd, so it has an inverse mod 256: 165, since 45 × 165 = 7425 = 29 × 256 + 1. Multiply the target remainder by it: 165 × 0x69 mod 256 = 173. Enter 173 and the gate opens.','A multiplier is invertible modulo 2^n exactly when it is odd. That single fact turns a multiply-based hash from a brute-force target into a one-step inversion, and it is why real hashes mix in non-invertible steps like rotation and XOR-shift.'),
+ section('Brute force versus algebra','With one byte of input you could brute-force all 256 values instantly — but the point is the method. Inverting the algebra scales to 16, 32, and 64-bit multipliers where brute force does not, and it is how key generators for multiply-based checks are written.','When a validator is pure modular arithmetic, reversing it is arithmetic too. The moment it adds a shift or a table lookup, inversion breaks and you reach for constraint solving — the next step up.')],
+ hints:['Subtract 0x1f first: the target before the add is 0x69.','45 is odd, so it has an inverse modulo 256 — that inverse is 165.','165 × 0x69 mod 256 = 173.'],
+ quiz:{q:'Why is the multiply by 0x2d invertible modulo 256?',options:['Because 0x2d is prime.','Because 0x2d is odd, so it is coprime with 256 and has a modular inverse.','Because the result is masked to a byte.'],answer:1,why:'A number is invertible modulo 2^n exactly when it is odd (coprime with the modulus); 45 is odd, so its inverse mod 256 exists, namely 165.'},refs:['intel']
+},
+{
  id:'three-gates',track:'crackmes',title:'Three gates, one key',subtitle:'Keep every path constraint in view.',duration:40,difficulty:'Intermediate',input:'256',inputLabel:'Candidate key (0–65535)',mode:'solve',goal:'Find a key accepted by the unmodified three-gate validator.',
  starter:`entry:
     cmp edi, 0x100
