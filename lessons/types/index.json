@@ -1,0 +1,6 @@
+[
+  {"id":"node","title":"A linked-list node","fn":"probe",
+   "note":"A pointer, two ints, and a byte. The recovered layout matches the source, and the trailing bytes after the char are padding the compiler adds so the next node in an array stays 8-byte aligned."},
+  {"id":"packet","title":"A header with alignment holes","fn":"probe",
+   "note":"The fields are declared small-to-large, so the compiler inserts padding to keep each one aligned: three bytes after the char, and six after the short before the 8-byte id. The access pattern reveals the holes — recovering them is how you get a struct layout right."}
+]
