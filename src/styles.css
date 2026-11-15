@@ -167,3 +167,26 @@ html[data-theme=light]{--bg:#f4f5ee;--sidebar:#e9ede3;--surface:#fffef8;--surfac
 .ty-reveal{margin:14px 0;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:8px 12px}
 .ty-reveal summary{cursor:pointer;font-size:13px;color:var(--accent)}
 .ty-reveal pre{margin:10px 0 2px;font-size:12px;color:var(--text);overflow-x:auto}
+
+/* Exploitation / mitigations explainer */
+.xpl{position:relative}
+.xpl-radio{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+.xpl-chain{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:14px 0}
+.xpl-stage{flex:1;min-width:150px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:10px;display:flex;flex-direction:column;gap:4px;transition:border-color .15s,box-shadow .15s}
+.xpl-stage strong{font-size:13px}
+.xpl-stage span:last-child{font-size:12px;color:var(--muted)}
+.xpl-num{width:20px;height:20px;border-radius:50%;background:var(--surface2);color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;font-family:var(--mono)}
+.xpl-arrow{align-self:center;color:var(--muted)}
+.xpl-mits{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+@media(max-width:720px){.xpl-mits{grid-template-columns:1fr}}
+.xpl-card{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:12px;cursor:pointer;display:block;transition:border-color .15s,background .15s}
+.xpl-card:hover{border-color:var(--accent)}
+.xpl-chead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.xpl-sub{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.xpl-breaks{margin-left:auto;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--surface2);color:var(--muted)}
+.xpl-card p{font-size:13px;margin:8px 0 0;line-height:1.55}
+.xpl-adapt{color:var(--muted)}
+.xpl-lab{display:inline-block;margin-top:8px;font-size:12px;color:var(--accent)}
+#xm-canary:checked ~ .xpl-chain .s2,#xm-nx:checked ~ .xpl-chain .s4,#xm-aslr:checked ~ .xpl-chain .s3,#xm-cfi:checked ~ .xpl-chain .s3{border-color:var(--red);box-shadow:0 0 0 2px var(--redbg)}
+#xm-canary:checked ~ .xpl-chain .s2 .xpl-num,#xm-nx:checked ~ .xpl-chain .s4 .xpl-num,#xm-aslr:checked ~ .xpl-chain .s3 .xpl-num,#xm-cfi:checked ~ .xpl-chain .s3 .xpl-num{background:var(--red);color:#fff}
+#xm-canary:checked ~ .xpl-mits label[for=xm-canary],#xm-nx:checked ~ .xpl-mits label[for=xm-nx],#xm-aslr:checked ~ .xpl-mits label[for=xm-aslr],#xm-cfi:checked ~ .xpl-mits label[for=xm-cfi]{border-color:var(--accent);background:var(--surface2)}
