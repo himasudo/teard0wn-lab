@@ -260,6 +260,78 @@ denied:
  quiz:{q:'Why is the multiply by 0x2d invertible modulo 256?',options:['Because 0x2d is prime.','Because 0x2d is odd, so it is coprime with 256 and has a modular inverse.','Because the result is masked to a byte.'],answer:1,why:'A number is invertible modulo 2^n exactly when it is odd (coprime with the modulus); 45 is odd, so its inverse mod 256 exists, namely 165.'},refs:['intel']
 },
 {
+ id:'state-machine',track:'crackmes',title:'Walk the state machine',subtitle:'Each nibble is checked against the last.',duration:45,difficulty:'Advanced',input:'0',inputLabel:'Candidate value (0–65535)',mode:'solve',goal:'Find the 16-bit value whose four nibbles satisfy the chain: each nibble is derived from the previous one. Trace the transitions to recover it.',
+ starter:`entry:
+    mov eax, edi
+    mov ebx, eax
+    and ebx, 0xf
+    cmp ebx, 2
+    jne denied
+    mov ecx, eax
+    shr ecx, 4
+    and ecx, 0xf
+    mov edx, ebx
+    add edx, 3
+    cmp ecx, edx
+    jne denied
+    mov ebx, ecx
+    mov ecx, eax
+    shr ecx, 8
+    and ecx, 0xf
+    mov edx, ebx
+    xor edx, 6
+    cmp ecx, edx
+    jne denied
+    mov ebx, ecx
+    mov ecx, eax
+    shr ecx, 12
+    and ecx, 0xf
+    mov edx, ebx
+    add edx, 4
+    cmp ecx, edx
+    jne denied
+    mov eax, 1
+    ret
+denied:
+    xor eax, eax
+    ret`,
+ answer:'29522',initial:n=>({edi:n}),check:(m,n)=>n>=0n&&n<=0xffffn&&retValue(m,1n),
+ sections:[section('State carried between checks','The validator reads the input one nibble at a time, low to high. The first nibble must be 2 — the seed. After that, each nibble is checked not against a constant but against the previous nibble transformed: plus 3, then XOR 6, then plus 4. The running value is the machine’s state.','This is what makes it a state machine rather than four independent gates: you cannot solve a later nibble without knowing the earlier one. The constraints are chained, so the solution is found by walking the transitions in order.'),
+ section('Trace the transitions','Seed: n0 = 2. Then n1 = n0 + 3 = 5. Then n2 = n1 XOR 6 = 5 XOR 6 = 3. Then n3 = n2 + 4 = 7. The nibbles, high to low, are 7 3 5 2, so the value is 0x7352 = 29522. Enter it and every gate passes.','Because each step is deterministic given the seed, the whole key follows from the first nibble. Had the seed itself been free, you would enumerate seeds and walk each — the structure still collapses the search to a short chain.'),
+ section('Why chained checks resist brute force','Four independent nibble gates would each have sixteen possibilities but factor apart — you could solve them separately. Chaining them means a wrong early nibble invalidates everything after, so random guessing wastes the whole trailing structure. Reconstructing the transition function is the only efficient route.','State machines are the backbone of real protocol and license validators: the input must drive the machine along one accepting path. Recovering that path from the transitions is the reversing skill this builds.')],
+ hints:['Work the nibbles low to high; the lowest must be 2.','Each next nibble is the previous one transformed: +3, then XOR 6, then +4.','Assemble the nibbles high-to-low into the 16-bit value.'],
+ quiz:{q:'Why can’t the four nibble checks be solved independently?',options:['They are encrypted.','Each nibble’s required value depends on the previous nibble, so they form a chain.','Only the first nibble matters.'],answer:1,why:'Every gate after the seed compares against a transform of the previous nibble, so the checks are chained and must be solved in order.'},refs:['intel']
+},
+{
+ id:'opaque-predicate',track:'crackmes',title:'See through the opaque predicate',subtitle:'A branch that only looks like it depends on the input.',duration:45,difficulty:'Advanced',input:'0',inputLabel:'Candidate value (0–255)',mode:'solve',goal:'One branch is dead code behind a predicate that is always true. Recognize it, ignore the decoy, and find the input the live path accepts.',
+ starter:`entry:
+    mov eax, edi
+    mov ecx, eax
+    imul ecx, eax
+    add ecx, eax
+    and ecx, 1
+    cmp ecx, 0
+    jne decoy
+    cmp eax, 0x42
+    jne denied
+    mov eax, 1
+    ret
+decoy:
+    cmp eax, 0x99
+    jne denied
+    mov eax, 1
+    ret
+denied:
+    xor eax, eax
+    ret`,
+ answer:'66',initial:n=>({edi:n}),check:(m,n)=>n>=0n&&n<=255n&&retValue(m,1n),
+ sections:[section('A predicate that is always the same','Before the real check, the validator computes x·x + x, keeps the low bit, and branches on whether it is zero. The branch looks input-dependent, but x·x + x is x·(x + 1) — the product of two consecutive integers, which is always even. Its low bit is always 0, so the branch is never taken.','This is an opaque predicate: a condition whose value the author knows in advance but which is written to look dynamic. It exists only to add a branch and a decoy, splitting the reader’s attention between a live path and dead code.'),
+ section('Ignore the dead branch','Because the predicate is always false for the jump, control always falls through to the live check: input == 0x42, which is 66. The decoy branch checks for 0x99 but is unreachable — that comparison never runs, so 0x99 is not a key. Enter 66 and the gate opens.','The skill is recognizing the algebraic identity. Once you see that x·(x + 1) is always even, the decoy collapses and the validator is just a single equality. A symbolic tool and a human both solve it by evaluating the predicate’s true range, not by tracing inputs.'),
+ section('Why obfuscators use them','Opaque predicates multiply across a binary to inflate its control-flow graph, hiding the few real checks among many dead ones. They defeat naive analysis that treats every branch as reachable. The counter is to prove a predicate constant — by algebra, by range analysis, or by a solver — and prune the dead path.','Here it is one identity; real obfuscators stack dozens, often over values a solver must reason about. Recognizing the pattern — a branch on an expression that cannot vary — is what lets you cut through them.')],
+ hints:['x·x + x is x·(x+1): the product of consecutive integers, always even.','So the low bit is always 0 and the jump to the decoy is never taken.','The live path checks for 0x42; the 0x99 branch is dead.'],
+ quiz:{q:'Why is the branch to the decoy never taken?',options:['The input is always even.','x·(x+1) is always even, so its low bit is 0 and the condition is constant.','The decoy was removed by the compiler.'],answer:1,why:'x·x + x = x·(x+1) is the product of two consecutive integers, always even, so the tested low bit is always 0 regardless of input.'},refs:['intel']
+},
+{
  id:'three-gates',track:'crackmes',title:'Three gates, one key',subtitle:'Keep every path constraint in view.',duration:40,difficulty:'Intermediate',input:'256',inputLabel:'Candidate key (0–65535)',mode:'solve',goal:'Find a key accepted by the unmodified three-gate validator.',
  starter:`entry:
     cmp edi, 0x100
