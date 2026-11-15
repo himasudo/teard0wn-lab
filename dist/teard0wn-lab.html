@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101414">
   <meta name="description" content="Take systems apart. An original systems and security laboratory with lessons, editable assembly, and an inspectable x86-64 teaching engine.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-4WMw8GMW/uABwyaeuJSRUQNO5d80Z17bIH5HkS+0FPY='; style-src 'sha256-U4vbs0SVF3EI7B4otYUOz3Gw+ErKZsp5k3VJY8/mXbA='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-QGSLYa7WWFNEjDR1IBAZZOgSF0Y5Dd5zlUIYMoWs65g='; style-src 'sha256-U4vbs0SVF3EI7B4otYUOz3Gw+ErKZsp5k3VJY8/mXbA='; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>teard0wn lab — Understand every layer</title>
   <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iMTIiIGZpbGw9IiNkNGY3NmIiLz48cGF0aCBkPSJNMTYgMTMgNyAyNGw5IDExTTMyIDEzbDkgMTEtOSAxMU0yNyAxMWwtNiAyNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTUxYjEzIiBzdHJva2Utd2lkdGg9IjMuMyIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPgo=" type="image/svg+xml">
   <style>@font-face{font-family:LabSans;src:local('Inter'),local('Arial');font-display:swap}
@@ -613,7 +613,7 @@ const tracks=[
  {id:'reversing',n:'02',title:'Reverse engineering',group:'Security',level:'Foundation → advanced',desc:'Recover behavior from bytes. Separate observation from a convincing guess.',units:['Static versus dynamic analysis','Recovering predicates','Inferring structures','Optimized and stripped binaries','Control-flow graphs','C++ objects, RTTI, and exceptions','Decompilation and its failure modes','Binary diffing and patch analysis'],labs:['recover-predicate','structure-layout'],prereqs:['assembly']},
  {id:'crackmes',n:'03',title:'Crackmes',group:'Security',level:'Progressive challenges',desc:'Original puzzles that make you reconstruct a program’s rules.',units:['One predicate','Multiple independent gates','Checksum and state-machine puzzles','Constraint-based solving','Obfuscation and opaque predicates','Virtual-machine reversing'],labs:['three-gates'],prereqs:['reversing']},
  {id:'shellcoding',n:'04',title:'Shellcoding',group:'Security',level:'Foundation → advanced',desc:'Understand executable bytes, operating-system boundaries, and payload constraints.',units:['A syscall without libc','Instruction bytes and restrictions','Position independence','i386 and x86-64 syscall conventions','Restricted-byte exercises','Controlled payload execution and mitigations'],labs:['write-without-libc'],prereqs:['assembly']},
- {id:'vulnerabilities',n:'05',title:'Vulnerability classes',group:'Security',level:'Foundation → advanced',desc:'Find the broken invariant behind overflows, lifetime errors, and races.',units:['Object bounds versus mapped memory','Integer overflow and conversions','Stack and heap overflows','Use-after-free and double-free','Format strings','Uninitialized memory and information leaks','Race conditions and TOCTOU','Root-cause repair and regression testing'],labs:['bounds-before-load','signed-bound','index-truncation','off-by-one-guard','size-overflow','uninit-leak','use-after-free','heap-overflow','aslr-leak','double-free','type-confusion'],prereqs:['assembly']},
+ {id:'vulnerabilities',n:'05',title:'Vulnerability classes',group:'Security',level:'Foundation → advanced',desc:'Find the broken invariant behind overflows, lifetime errors, and races.',units:['Object bounds versus mapped memory','Integer overflow and conversions','Stack and heap overflows','Use-after-free and double-free','Format strings','Uninitialized memory and information leaks','Race conditions and TOCTOU','Root-cause repair and regression testing'],labs:['bounds-before-load','signed-bound','index-truncation','off-by-one-guard','size-overflow','uninit-leak','use-after-free','heap-overflow','aslr-leak','double-free','type-confusion','stack-canary','null-deref'],prereqs:['assembly']},
  {id:'binary',n:'06',title:'Binary exploitation',group:'Security',level:'Intermediate → advanced',desc:'Follow corruption into control flow in deliberately vulnerable lab programs.',units:['Saved return addresses and ret2win','pwntools and binary I/O','Finding offsets and constructing inputs','Leaks and ASLR','ret2libc','GOT/PLT and RELRO','ROP and stack pivots','Canaries, PIE, NX, and CFI','Reliability, failure analysis, and repairs'],labs:['saved-return'],prereqs:['vulnerabilities','reversing','shellcoding']},
  {id:'heap',n:'07',title:'Heap exploitation',group:'Security',level:'Intermediate → advanced',desc:'Read allocator state before studying what corruption can make it do.',units:['Build an allocator','Chunks, bins, and invariants','Pinned glibc allocator versions','Tcache and double-free','Tcache poisoning and safe-linking','House of spirit and house of force (historical)','Unsafe unlink and its checks (historical)','Lifetime design and exploit-resistant repair'],labs:[],prereqs:['binary','c-boundaries']},
  {id:'triage',n:'08',title:'Crash triage & sanitizers',group:'Security',level:'Intermediate',desc:'Turn a crash into a minimized reproducer and an explained fix.',units:['Fault classification','Core dumps and unwinding','ASan and UBSan','MSan and TSan constraints','Reproducer minimization','Crash deduplication','Regression testing a repair'],labs:[],prereqs:['vulnerabilities']},
@@ -1303,6 +1303,95 @@ target:
  section('Fix: check the tag before interpreting the payload','Load the tag and dereference only when it marks the pointer type; otherwise return the error. The integer type’s value is then never treated as an address. Verify that the pointer type returns 99 and the integer type returns the error.','The invariant is that a value’s type must be confirmed before it is used as that type. Tagged unions, RTTI checks, and sealed object shapes all exist to enforce exactly this before a payload is dereferenced or called.')],
  hints:['The handler dereferences the payload without reading the tag.','Only tag 1 marks a real pointer; load the tag and compare before dereferencing.','For tag 0, return mov rax, -1 instead of touching the payload.'],
  quiz:{q:'Why is treating the integer object as the pointer type dangerous?',options:['Integers are larger than pointers.','Its data value is used as an address, giving an attacker-chosen read or write.','The tag field is always correct.'],answer:1,why:'The payload is dereferenced as a pointer; if the integer value is attacker-controlled, so is the address accessed, yielding an arbitrary read or write.'},refs:['intel','memory']
+},
+{
+ id:'stack-canary',track:'vulnerabilities',title:'A canary catches the smash',subtitle:'The overflow still happens — the canary is how you detect it.',duration:50,difficulty:'Advanced',input:'4',inputLabel:'Overflow length in quads (RDI)',mode:'repair',goal:'Return the saved return value only when the canary is intact; if a contiguous overflow of 3 or more quads has crossed the canary, detect it and return UINT64_MAX. (CWE-121; the stack-protector pattern.)',
+ starter:`entry:
+    lea rsi, [frame]
+    mov rcx, 0
+wloop:
+    cmp rcx, rdi
+    jae wdone
+    mov rdx, 0xaaaa
+    mov qword ptr [rsi+rcx*8], rdx
+    add rcx, 1
+    jmp wloop
+wdone:
+    mov rax, qword ptr [savedret]
+    ret
+.data
+frame:
+buf:
+    .quad 0, 0
+canary:
+    .quad 0x12345678
+savedret:
+    .quad 0xABCD`,
+ solution:`entry:
+    lea rsi, [frame]
+    mov rcx, 0
+wloop:
+    cmp rcx, rdi
+    jae wdone
+    mov rdx, 0xaaaa
+    mov qword ptr [rsi+rcx*8], rdx
+    add rcx, 1
+    jmp wloop
+wdone:
+    mov rax, qword ptr [canary]
+    cmp rax, 0x12345678
+    jne smashed
+    mov rax, qword ptr [savedret]
+    ret
+smashed:
+    mov rax, -1
+    ret
+.data
+frame:
+buf:
+    .quad 0, 0
+canary:
+    .quad 0x12345678
+savedret:
+    .quad 0xABCD`,initial:n=>({rdi:n}),cases:[0n,1n,2n,3n,4n],check:(m,n)=>retValue(m,n<3n?0xABCDn:-1n),
+ sections:[section('The frame: buffer, canary, saved return','The frame holds a two-slot buffer, then a canary word (0x12345678), then the saved return value. The function writes RDI quads of a marker starting at the buffer — a stand-in for a copy whose length is not bounded. A length over 2 is a contiguous overflow that runs through the canary and into the saved return.','A stack canary does not stop the overflow. It is a known value placed between the buffer and the saved return address so that any contiguous overflow large enough to reach the return address must first overwrite the canary.'),
+ section('Detect the smash before trusting the return','Enter 4 and run the starter: the overflow overwrites the canary and the saved return, and the function returns the attacker’s marker as if it were the legitimate return — a hijack. The starter never looks at the canary. Enter 3 and the canary is already clobbered even though the saved return is not yet reached; the smash is in progress and still undetected.','This models the stack-smashing protector (-fstack-protector). The compiler stores a per-process canary on entry and, in the epilogue, compares it with the master value before returning. A mismatch means a buffer overran its bounds, and the program aborts rather than return through a corrupted address.'),
+ section('Fix: check the canary in the epilogue','Before using the saved return, load the canary and compare it with its expected value; on mismatch, return the error instead. Any overflow that reached the saved return necessarily tripped the canary first, so the check catches it. Verify that lengths up to 2 return the saved value and lengths of 3 or more are caught.','A canary is a detection control, not a prevention one: the memory is still corrupted when the check fires. It also only catches contiguous overflows that cross it, which is why it pairs with bounds checking, NX, and ASLR rather than replacing them.')],
+ hints:['The canary sits between the buffer and the saved return value.','In the epilogue, compare the canary with 0x12345678 before returning.','A contiguous overflow of 3 or more quads overwrites the canary first.'],
+ quiz:{q:'What does a stack canary actually guarantee?',options:['The overflow cannot happen.','A contiguous overflow that reached the return address overwrote the canary first, so it can be detected before return.','The return address is encrypted.'],answer:1,why:'The canary is a known value between the buffer and the saved return; detecting its change reveals that an overflow crossed it, though the corruption has already occurred.'},refs:['intel','memory']
+},
+{
+ id:'null-deref',track:'vulnerabilities',title:'Dereferencing a pointer that might be null',subtitle:'A lookup that can fail, used as if it never does.',duration:35,difficulty:'Intermediate',input:'0',inputLabel:'Lookup key (RDI)',mode:'repair',goal:'Return the looked-up value (77) when the key is found, and UINT64_MAX when it is not — without dereferencing the null pointer a failed lookup returns. (CWE-476.)',
+ starter:`entry:
+    cmp rdi, 1
+    je found
+    mov rax, 0
+    jmp deref
+found:
+    lea rax, [value]
+deref:
+    mov rax, qword ptr [rax]
+    ret
+.data
+value:
+    .quad 77`,
+ solution:`entry:
+    cmp rdi, 1
+    je found
+    mov rax, -1
+    ret
+found:
+    lea rax, [value]
+    mov rax, qword ptr [rax]
+    ret
+.data
+value:
+    .quad 77`,initial:n=>({rdi:n}),cases:[0n,1n,2n],check:(m,n)=>retValue(m,n===1n?77n:-1n),
+ sections:[section('A lookup returns a pointer or null','The function looks up a key. A hit returns a pointer to the value; a miss returns a null pointer. The starter dereferences the result unconditionally, so a miss dereferences null.','Null-pointer dereference (CWE-476) is the most common shape of this bug: an API that can return null on failure, and a caller that uses the result without checking. The failure path is often the untested one.'),
+ section('Why the miss faults','Enter 0, a key that is not present. The lookup yields null, and the dereference reads address 0, which is unmapped — the engine faults. On a real system this is at least a crash (denial of service), and where low addresses can be mapped it becomes a controllable write through a near-null offset.','Enter 1, the present key, and it returns 77 correctly. The bug lives entirely on the path the happy case never exercises, which is why these reach production: the code works until the lookup misses.'),
+ section('Fix: check for null before dereferencing','Return the error on the miss path instead of dereferencing. Only dereference the pointer once it is known to be non-null. Verify a hit returns the value and every miss returns the error without a fault.','The invariant is that a pointer which can be null must be proven non-null before use. The discipline is to handle the failure return of every call that has one, at the call site, before touching what it returned.')],
+ hints:['A missed lookup returns a null pointer here.','Return mov rax, -1 on the miss path instead of dereferencing.','Only dereference once the pointer is known non-null.'],
+ quiz:{q:'Why does the miss path fault while the hit path works?',options:['The hit path is slower.','The miss returns null and the code dereferences address 0, which is unmapped.','Null pointers always equal the value 77.'],answer:1,why:'A failed lookup yields a null pointer; dereferencing it reads unmapped address 0 and faults, while the hit path dereferences a valid pointer.'},refs:['intel','memory']
 },
 {
  id:'saved-return',track:'binary',title:'Who chooses the next instruction?',subtitle:'Follow a saved return address from data into control flow.',duration:45,difficulty:'Intermediate',input:'0',inputLabel:'Unused input',mode:'repair',goal:'In this deliberately vulnerable fixture, redirect the overwritten return address to win and reach its return value of 42.',

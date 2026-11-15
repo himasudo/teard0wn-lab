@@ -670,6 +670,95 @@ target:
  quiz:{q:'Why is treating the integer object as the pointer type dangerous?',options:['Integers are larger than pointers.','Its data value is used as an address, giving an attacker-chosen read or write.','The tag field is always correct.'],answer:1,why:'The payload is dereferenced as a pointer; if the integer value is attacker-controlled, so is the address accessed, yielding an arbitrary read or write.'},refs:['intel','memory']
 },
 {
+ id:'stack-canary',track:'vulnerabilities',title:'A canary catches the smash',subtitle:'The overflow still happens — the canary is how you detect it.',duration:50,difficulty:'Advanced',input:'4',inputLabel:'Overflow length in quads (RDI)',mode:'repair',goal:'Return the saved return value only when the canary is intact; if a contiguous overflow of 3 or more quads has crossed the canary, detect it and return UINT64_MAX. (CWE-121; the stack-protector pattern.)',
+ starter:`entry:
+    lea rsi, [frame]
+    mov rcx, 0
+wloop:
+    cmp rcx, rdi
+    jae wdone
+    mov rdx, 0xaaaa
+    mov qword ptr [rsi+rcx*8], rdx
+    add rcx, 1
+    jmp wloop
+wdone:
+    mov rax, qword ptr [savedret]
+    ret
+.data
+frame:
+buf:
+    .quad 0, 0
+canary:
+    .quad 0x12345678
+savedret:
+    .quad 0xABCD`,
+ solution:`entry:
+    lea rsi, [frame]
+    mov rcx, 0
+wloop:
+    cmp rcx, rdi
+    jae wdone
+    mov rdx, 0xaaaa
+    mov qword ptr [rsi+rcx*8], rdx
+    add rcx, 1
+    jmp wloop
+wdone:
+    mov rax, qword ptr [canary]
+    cmp rax, 0x12345678
+    jne smashed
+    mov rax, qword ptr [savedret]
+    ret
+smashed:
+    mov rax, -1
+    ret
+.data
+frame:
+buf:
+    .quad 0, 0
+canary:
+    .quad 0x12345678
+savedret:
+    .quad 0xABCD`,initial:n=>({rdi:n}),cases:[0n,1n,2n,3n,4n],check:(m,n)=>retValue(m,n<3n?0xABCDn:-1n),
+ sections:[section('The frame: buffer, canary, saved return','The frame holds a two-slot buffer, then a canary word (0x12345678), then the saved return value. The function writes RDI quads of a marker starting at the buffer — a stand-in for a copy whose length is not bounded. A length over 2 is a contiguous overflow that runs through the canary and into the saved return.','A stack canary does not stop the overflow. It is a known value placed between the buffer and the saved return address so that any contiguous overflow large enough to reach the return address must first overwrite the canary.'),
+ section('Detect the smash before trusting the return','Enter 4 and run the starter: the overflow overwrites the canary and the saved return, and the function returns the attacker’s marker as if it were the legitimate return — a hijack. The starter never looks at the canary. Enter 3 and the canary is already clobbered even though the saved return is not yet reached; the smash is in progress and still undetected.','This models the stack-smashing protector (-fstack-protector). The compiler stores a per-process canary on entry and, in the epilogue, compares it with the master value before returning. A mismatch means a buffer overran its bounds, and the program aborts rather than return through a corrupted address.'),
+ section('Fix: check the canary in the epilogue','Before using the saved return, load the canary and compare it with its expected value; on mismatch, return the error instead. Any overflow that reached the saved return necessarily tripped the canary first, so the check catches it. Verify that lengths up to 2 return the saved value and lengths of 3 or more are caught.','A canary is a detection control, not a prevention one: the memory is still corrupted when the check fires. It also only catches contiguous overflows that cross it, which is why it pairs with bounds checking, NX, and ASLR rather than replacing them.')],
+ hints:['The canary sits between the buffer and the saved return value.','In the epilogue, compare the canary with 0x12345678 before returning.','A contiguous overflow of 3 or more quads overwrites the canary first.'],
+ quiz:{q:'What does a stack canary actually guarantee?',options:['The overflow cannot happen.','A contiguous overflow that reached the return address overwrote the canary first, so it can be detected before return.','The return address is encrypted.'],answer:1,why:'The canary is a known value between the buffer and the saved return; detecting its change reveals that an overflow crossed it, though the corruption has already occurred.'},refs:['intel','memory']
+},
+{
+ id:'null-deref',track:'vulnerabilities',title:'Dereferencing a pointer that might be null',subtitle:'A lookup that can fail, used as if it never does.',duration:35,difficulty:'Intermediate',input:'0',inputLabel:'Lookup key (RDI)',mode:'repair',goal:'Return the looked-up value (77) when the key is found, and UINT64_MAX when it is not — without dereferencing the null pointer a failed lookup returns. (CWE-476.)',
+ starter:`entry:
+    cmp rdi, 1
+    je found
+    mov rax, 0
+    jmp deref
+found:
+    lea rax, [value]
+deref:
+    mov rax, qword ptr [rax]
+    ret
+.data
+value:
+    .quad 77`,
+ solution:`entry:
+    cmp rdi, 1
+    je found
+    mov rax, -1
+    ret
+found:
+    lea rax, [value]
+    mov rax, qword ptr [rax]
+    ret
+.data
+value:
+    .quad 77`,initial:n=>({rdi:n}),cases:[0n,1n,2n],check:(m,n)=>retValue(m,n===1n?77n:-1n),
+ sections:[section('A lookup returns a pointer or null','The function looks up a key. A hit returns a pointer to the value; a miss returns a null pointer. The starter dereferences the result unconditionally, so a miss dereferences null.','Null-pointer dereference (CWE-476) is the most common shape of this bug: an API that can return null on failure, and a caller that uses the result without checking. The failure path is often the untested one.'),
+ section('Why the miss faults','Enter 0, a key that is not present. The lookup yields null, and the dereference reads address 0, which is unmapped — the engine faults. On a real system this is at least a crash (denial of service), and where low addresses can be mapped it becomes a controllable write through a near-null offset.','Enter 1, the present key, and it returns 77 correctly. The bug lives entirely on the path the happy case never exercises, which is why these reach production: the code works until the lookup misses.'),
+ section('Fix: check for null before dereferencing','Return the error on the miss path instead of dereferencing. Only dereference the pointer once it is known to be non-null. Verify a hit returns the value and every miss returns the error without a fault.','The invariant is that a pointer which can be null must be proven non-null before use. The discipline is to handle the failure return of every call that has one, at the call site, before touching what it returned.')],
+ hints:['A missed lookup returns a null pointer here.','Return mov rax, -1 on the miss path instead of dereferencing.','Only dereference once the pointer is known non-null.'],
+ quiz:{q:'Why does the miss path fault while the hit path works?',options:['The hit path is slower.','The miss returns null and the code dereferences address 0, which is unmapped.','Null pointers always equal the value 77.'],answer:1,why:'A failed lookup yields a null pointer; dereferencing it reads unmapped address 0 and faults, while the hit path dereferences a valid pointer.'},refs:['intel','memory']
+},
+{
  id:'saved-return',track:'binary',title:'Who chooses the next instruction?',subtitle:'Follow a saved return address from data into control flow.',duration:45,difficulty:'Intermediate',input:'0',inputLabel:'Unused input',mode:'repair',goal:'In this deliberately vulnerable fixture, redirect the overwritten return address to win and reach its return value of 42.',
  starter:`entry:
     call vulnerable
