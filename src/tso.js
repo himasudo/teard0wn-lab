@@ -67,4 +67,12 @@ export const litmus=[
    threads:[['ld r0 x','st y 1'],['ld r1 y','st x 1']],
    regs:['r0','r1'],question:{r0:1,r1:1},tso:'forbidden',
    blurb:'Each core reads one location then writes the other. For both to read 1, each store would have to be seen before the load that precedes it in program order — a load-store reorder TSO never does. Weaker models (ARM, Power) do allow it, which is why portable lock-free code cannot assume this stays forbidden.'},
+  {id:'wrc',name:'Write-to-Read Causality (WRC)',
+   threads:[['st x 1'],['ld r0 x','st y 1'],['ld r1 y','ld r2 x']],
+   regs:['r0','r1','r2'],question:{r0:1,r1:1,r2:0},tso:'forbidden',
+   blurb:'Core 0 writes x; core 1 reads x then writes y; core 2 reads y then x. If core 1 saw x=1 and core 2 saw y=1, can core 2 still read x=0? TSO says no: a store drains to one shared memory visible to everyone at once, so once core 1’s read observed x it is visible to core 2 too. This write atomicity is what lets causality hold without a fence — and what weaker, non-multi-copy-atomic models drop.'},
+  {id:'iriw',name:'Independent Reads of Independent Writes (IRIW)',
+   threads:[['st x 1'],['st y 1'],['ld r0 x','ld r1 y'],['ld r2 y','ld r3 x']],
+   regs:['r0','r1','r2','r3'],question:{r0:1,r1:0,r2:1,r3:0},tso:'forbidden',
+   blurb:'Two cores write x and y independently; two reader cores each read both, in opposite order. Can one reader see x before y while the other sees y before x? On x86 no — there is a single global order in which the two stores become visible, so the readers cannot disagree about it. IRIW is the sharpest test of multi-copy atomicity; Power allows the disagreement, x86-TSO forbids it.'},
 ];

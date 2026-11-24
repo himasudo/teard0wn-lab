@@ -26,6 +26,14 @@ test('LB forbids both loads returning 1 under TSO', () => {
   assert.equal(explore(byId('lb')).has('1,1'), false);
 });
 
+test('WRC preserves write-to-read causality without a fence', () => {
+  assert.equal(questionReachable(byId('wrc')), false, 'the causality-violating outcome is unreachable under TSO');
+});
+
+test('IRIW forbids the two readers disagreeing on store order', () => {
+  assert.equal(questionReachable(byId('iriw')), false, 'multi-copy atomicity: a single global store order');
+});
+
 test('each litmus test\'s declared verdict matches the model', () => {
   for(const l of litmus){
     const reachable=questionReachable(l);
