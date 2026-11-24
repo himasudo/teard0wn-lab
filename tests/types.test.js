@@ -27,6 +27,18 @@ test('a header declared small-to-large recovers interior padding holes', () => {
   assert.ok(pads.some(f => f.off === 10 && f.size === 6), 'padding before the 8-byte field');
 });
 
+test('a tightly-packed struct has no padding', () => {
+  const {fields, size} = recoverStruct(ex('quad').accesses);
+  assert.equal(size, 16);
+  assert.equal(fields.filter(f => f.pad).length, 0, 'four equal ints pack with no holes');
+});
+
+test('mixed field sizes produce two padding holes', () => {
+  const {fields, size} = recoverStruct(ex('record').accesses);
+  assert.equal(size, 24);
+  assert.ok(fields.filter(f => f.pad).length >= 2, 'alignment forces interior and tail padding');
+});
+
 test('every example carries its source for the reveal', () => {
   for (const e of typeExamples) {
     assert.ok(e.accesses.length >= 2, `${e.id} has an access trace`);

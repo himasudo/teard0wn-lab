@@ -1,6 +1,26 @@
 [
-  {"id":"node","title":"A linked-list node","fn":"probe",
-   "note":"A pointer, two ints, and a byte. The recovered layout matches the source, and the trailing bytes after the char are padding the compiler adds so the next node in an array stays 8-byte aligned."},
-  {"id":"packet","title":"A header with alignment holes","fn":"probe",
-   "note":"The fields are declared small-to-large, so the compiler inserts padding to keep each one aligned: three bytes after the char, and six after the short before the 8-byte id. The access pattern reveals the holes — recovering them is how you get a struct layout right."}
+  {
+    "id": "node",
+    "title": "A linked-list node",
+    "fn": "probe",
+    "note": "A pointer, two ints, and a byte. The recovered layout matches the source, and the trailing bytes after the char are padding the compiler adds so the next node in an array stays 8-byte aligned."
+  },
+  {
+    "id": "packet",
+    "title": "A header with alignment holes",
+    "fn": "probe",
+    "note": "The fields are declared small-to-large, so the compiler inserts padding to keep each one aligned: three bytes after the char, and six after the short before the 8-byte id. The access pattern reveals the holes \u2014 recovering them is how you get a struct layout right."
+  },
+  {
+    "id": "record",
+    "title": "Mixed field sizes, two holes",
+    "fn": "probe",
+    "note": "Declared short, long, int, char \u2014 a jumble of sizes. The compiler pads the short up to the long's 8-byte alignment and pads the tail, so the 15 bytes of fields occupy 24. Two holes fall out of the access pattern."
+  },
+  {
+    "id": "quad",
+    "title": "Four ints, packed tight",
+    "fn": "probe",
+    "note": "Four equal-sized fields in a row need no padding at all \u2014 the recovered layout is a solid 16 bytes with no holes. Ordering fields large-to-small (or equal) is how you avoid the padding the other structs show."
+  }
 ]
