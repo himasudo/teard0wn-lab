@@ -32,6 +32,21 @@ test('a signedness fix changes the comparison (removed and added)', () => {
   assert.match(removed, /jle|jg/, 'the signed branch is removed');
 });
 
+test('an off-by-one fix is a single changed comparison', () => {
+  const p = pair('offbyone-patch');
+  const s = diffStats(diffInsns(p.a.insns, p.b.insns));
+  assert.equal(s.added, 1);
+  assert.equal(s.removed, 1);
+});
+
+test('an integer-overflow fix adds a division-based guard', () => {
+  const p = pair('intovf-patch');
+  const rows = diffInsns(p.a.insns, p.b.insns);
+  assert.equal(rows.filter(r => r.kind === 'del').length, 0, 'purely additive');
+  const added = rows.filter(r => r.kind === 'add').map(r => r.b.text).join('\n');
+  assert.match(added, /idiv|\bdiv\b/, 'the guard divides MAX by the operand');
+});
+
 test('both pairs expose the two builds', () => {
   for (const p of diffPairs) {
     assert.ok(p.a.insns.length && p.b.insns.length, `${p.id} has both builds`);

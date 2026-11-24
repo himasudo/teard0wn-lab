@@ -1,6 +1,34 @@
 [
-  {"id":"bounds-patch","title":"A missing bounds check","fn":"get","label_a":"vulnerable","label_b":"patched",
-   "note":"The patch inserts an unsigned bounds check before the indexed load. The vulnerable build reads a[i] for any i, including out-of-range and negative values; the fix rejects i >= 4 first. This added compare-and-branch is the entire security fix."},
-  {"id":"signed-patch","title":"A signed check made unsigned","fn":"pick","label_a":"vulnerable","label_b":"patched",
-   "note":"The only change is the comparison: the vulnerable build uses a signed test (so a negative index passes), the patch uses an unsigned one. A single changed branch instruction is the fix — the kind of one-instruction delta patch-diffing exists to find."}
+  {
+    "id": "bounds-patch",
+    "title": "A missing bounds check",
+    "fn": "get",
+    "label_a": "vulnerable",
+    "label_b": "patched",
+    "note": "The patch inserts an unsigned bounds check before the indexed load. The vulnerable build reads a[i] for any i, including out-of-range and negative values; the fix rejects i >= 4 first. This added compare-and-branch is the entire security fix."
+  },
+  {
+    "id": "signed-patch",
+    "title": "A signed check made unsigned",
+    "fn": "pick",
+    "label_a": "vulnerable",
+    "label_b": "patched",
+    "note": "The only change is the comparison: the vulnerable build uses a signed test (so a negative index passes), the patch uses an unsigned one. A single changed branch instruction is the fix \u2014 the kind of one-instruction delta patch-diffing exists to find."
+  },
+  {
+    "id": "intovf-patch",
+    "title": "A size multiply with no overflow check",
+    "fn": "alloc_size",
+    "label_a": "vulnerable",
+    "label_b": "patched",
+    "note": "The patch adds the overflow guard before the multiply: if count exceeds INT64_MAX/width the product would wrap, so the fix rejects it. Without it, count*width overflows to a small size the caller then trusts for an allocation."
+  },
+  {
+    "id": "offbyone-patch",
+    "title": "An off-by-one in the bound",
+    "fn": "get",
+    "label_a": "vulnerable",
+    "label_b": "patched",
+    "note": "The array holds four elements, so the valid indices are 0..3. The vulnerable build rejects only i > 4, admitting index 4 \u2014 one past the end. The patch changes the comparison to i >= 4. A single changed branch is the whole fix."
+  }
 ]
