@@ -22,6 +22,15 @@ test('the shallow target is found quickly', () => {
   assert.match(f.crash.reason, /divide by zero/i);
 });
 
+test('the gated target crashes with a memory fault, not a divide', () => {
+  const f = new Fuzzer(target('f-tablefault'));
+  while (!f.crash && f.execs < 400000) f.step(2000);
+  assert.ok(f.crash, `no crash in ${f.execs} execs`);
+  assert.equal(f.crash.input & 0xffff, 0x3c5a, 'both byte gates were satisfied');
+  assert.match(f.crash.reason, /read at 0x/i, 'the crash is an out-of-bounds read');
+  assert.doesNotMatch(f.crash.reason, /divide/i);
+});
+
 test('the known crashing input faults; a benign input does not', () => {
   const p = programFromImage(target('f-crackme'));
   assert.equal(coverageRun(p, 0x42421337).fault, true);
